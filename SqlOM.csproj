@@ -1,0 +1,44 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net9.0</TargetFrameworks>
+    <LangVersion>latest</LangVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    
+    <!-- Package Metadata -->
+    <Title>SqlOM - Dynamic SQL Query Generator</Title>
+    <Description>SqlOM is a software component which allows you to programmatically create SQL queries at runtime using a convenient .NET Object Model, thus creating an abstraction layer over SQL. Supports SQL Server, Oracle, MySQL, MariaDB, and SQLite.</Description>
+    <Authors>SqlOM Contributors</Authors>
+    <Company>SqlOM</Company>
+    <Copyright>Copyright © onnop</Copyright>
+    <PackageProjectUrl>https://github.com/onnop/SqlOM</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/onnop/SqlOM</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageLicenseFile>License.txt</PackageLicenseFile>
+    <PackageIcon>Logo_initials.png</PackageIcon>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageTags>SQL;SQL-Generator;Query-Builder;Dynamic-SQL;Database;ORM;SQL-Server;Oracle;MySQL;MariaDB;SQLite</PackageTags>
+    <PackageReleaseNotes>
+      Version 1.0.2 - Enhanced Documentation
+      • Multi-targets .NET 8.0 and .NET 9.0
+      • Modernized codebase with C# 12 features
+      • Improved nullable reference type support
+      • Enhanced code quality and performance
+      • File-scoped namespaces throughout
+      • Modern switch expressions
+      • Improved string handling and StringBuilder usage
+      • Better immutability with readonly modifiers
+      • Enhanced documentation and README
+    </PackageReleaseNotes>
+    <Version>1.0.2</Version>
+    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="License.txt" Pack="true" PackagePath="\" />
+    <None Include="Logo_initials.png" Pack="true" PackagePath="\" />
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+</Project>
