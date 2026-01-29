@@ -20,18 +20,14 @@
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageTags>SQL;SQL-Generator;Query-Builder;Dynamic-SQL;Database;ORM;SQL-Server;Oracle;MySQL;MariaDB;SQLite</PackageTags>
     <PackageReleaseNotes>
-      Version 1.0.2 - Enhanced Documentation
-      • Multi-targets .NET 8.0 and .NET 9.0
-      • Modernized codebase with C# 12 features
-      • Improved nullable reference type support
-      • Enhanced code quality and performance
-      • File-scoped namespaces throughout
-      • Modern switch expressions
-      • Improved string handling and StringBuilder usage
-      • Better immutability with readonly modifiers
-      • Enhanced documentation and README
+      Version 1.0.3 - Attribute-Based Query Building
+      • New [TableName], [TableAlias], [ColumnName], [IgnoreColumn] attributes
+      • Strongly-typed query building with Table&lt;T&gt;(), Field&lt;T&gt;(), ColumnName&lt;T&gt;()
+      • Auto-generate SELECT columns with AddAllColumns&lt;T&gt;()
+      • Auto-aliasing when column name differs from property name
+      • GenerateSelectQuery&lt;T&gt;() for quick query scaffolding
     </PackageReleaseNotes>
-    <Version>1.0.2</Version>
+    <Version>1.0.3</Version>
     <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
   </PropertyGroup>
 

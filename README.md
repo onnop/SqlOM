@@ -1,4 +1,4 @@
-﻿# SqlOM
+# SqlOM
 
 [![NuGet](https://img.shields.io/nuget/v/SqlOM.svg)](https://www.nuget.org/packages/SqlOM)
 [![.NET](https://img.shields.io/badge/.NET-8.0%20%7C%209.0-blue.svg)](https://dotnet.microsoft.com/download)
@@ -29,7 +29,7 @@ dotnet add package SqlOM
 
 ### PackageReference
 ```xml
-<PackageReference Include="SqlOM" Version="1.0.2" />
+<PackageReference Include="SqlOM" Version="1.0.3" />
 ```
 
 ## Supported Databases
@@ -53,6 +53,7 @@ Currently the following databases are supported. We continuously add support for
 - ✅ Paging support
 - ✅ Parameterized queries
 - ✅ Cross-Tabs (Pivot Tables)
+- ✅ Attribute-based strongly-typed query building
 - ✅ Modern C# 12 syntax support
 - ✅ Multi-targets .NET 8.0 and .NET 9.0
 
@@ -344,7 +345,105 @@ string sql = renderer.RenderSelect(query);
 //         FROM [orders] [o] GROUP BY [o].[customerId] ORDER BY [totalAmount] desc
 ```
 
-### 12. CASE Expressions
+### 12. Strongly-Typed Query Building with Attributes
+
+Use attributes to define table and column mappings, then build queries without magic strings:
+
+#### Define Row Types with Attributes
+
+```csharp
+using Reeb.SqlOM;
+
+[TableName("customers"), TableAlias("c")]
+public class CustomerRow
+{
+    public string Id { get; set; }
+    public string Name { get; set; }
+    public string Email { get; set; }
+    [IgnoreColumn] public List<OrderRow> Orders { get; set; } // Navigation property, not a column
+}
+
+[TableName("orders"), TableAlias("o")]
+public class OrderRow
+{
+    public string Id { get; set; }
+    [ColumnName("customer_id")] public string CustomerId { get; set; } // Maps to different column name
+    public decimal Total { get; set; }
+    public DateTime OrderDate { get; set; }
+}
+```
+
+#### Build Queries Using Row Types
+
+```csharp
+using Reeb.SqlOM;
+using static Reeb.SqlOM.SqlOMExtensions;
+
+// Create table references from attributes
+var tCustomers = Table<CustomerRow>();  // FromTerm.Table("customers", "c")
+var tOrders = Table<OrderRow>();        // FromTerm.Table("orders", "o")
+
+SelectQuery query = new SelectQuery();
+
+// Add all columns from a type (excludes [IgnoreColumn] properties)
+query.Columns.AddAllColumns<CustomerRow>(tCustomers);
+
+// Add specific columns with auto-aliasing
+// CustomerId has [ColumnName("customer_id")], so this generates: customer_id AS CustomerId
+query.Columns.Add<OrderRow>(x => x.CustomerId, tOrders);
+query.Columns.Add<OrderRow>(x => x.Total, tOrders);
+
+query.FromClause.BaseTable = tCustomers;
+query.FromClause.Join(JoinType.Left, tCustomers, tOrders, 
+    nameof(CustomerRow.Id), 
+    ColumnName<OrderRow>(x => x.CustomerId));  // Returns "customer_id"
+
+// Use strongly-typed field expressions in WHERE
+query.WherePhrase.Terms.Add(WhereTerm.CreateCompare(
+    Field<OrderRow>(x => x.Total, tOrders),
+    SqlExpression.Number(100),
+    CompareOperator.Greater));
+
+SqlServerRenderer renderer = new SqlServerRenderer();
+string sql = renderer.RenderSelect(query);
+```
+
+#### Quick Query Generation
+
+Generate a complete SELECT query from a row type in one line:
+
+```csharp
+// Generates: SELECT Id, Name, Email FROM customers c
+SelectQuery query = GenerateSelectQuery<CustomerRow>();
+
+// With custom alias
+SelectQuery query = GenerateSelectQuery<CustomerRow>("cust");
+```
+
+#### Available Attributes
+
+| Attribute | Target | Description |
+|-----------|--------|-------------|
+| `[TableName("name")]` | Class | Specifies the database table name |
+| `[TableAlias("alias")]` | Class | Specifies the default alias in queries |
+| `[ColumnName("name")]` | Property | Maps property to a different column name |
+| `[IgnoreColumn]` | Property | Excludes property from `AddAllColumns<T>()` |
+
+#### Helper Methods
+
+| Method | Description |
+|--------|-------------|
+| `Table<T>()` | Creates `FromTerm` using `[TableName]` and `[TableAlias]` |
+| `Table<T>(alias)` | Creates `FromTerm` with custom alias |
+| `TableName<T>()` | Gets table name from attribute or type name |
+| `TableAlias<T>()` | Gets alias from attribute or first letter |
+| `ColumnName<T>(x => x.Prop)` | Gets column name from `[ColumnName]` or property name |
+| `Field<T>(x => x.Prop, table)` | Creates `SqlExpression.Field` with correct column name |
+| `columns.Add<T>(x => x.Prop, table)` | Adds column with auto-aliasing |
+| `columns.AddAllColumns<T>(table)` | Adds all non-ignored properties |
+| `GenerateSelectQuery<T>()` | Creates query with all columns from type |
+
+### 13. CASE Expressions (Advanced)
 
 Using CASE statements in SELECT columns:
 
@@ -373,7 +472,7 @@ SqlServerRenderer renderer = new SqlServerRenderer();
 string sql = renderer.RenderSelect(query);
 ```
 
-### 13. UNION Queries
+### 14. UNION Queries
 
 Combining multiple SELECT queries:
 
@@ -397,7 +496,7 @@ string sql = renderer.RenderUnion(union);
 // Result: SELECT price * 10 [priceX10] FROM [products] UNION ALL SELECT [price] [priceX10] FROM [products]
 ```
 
-### 14. Parameterized Queries
+### 15. Parameterized Queries
 
 Using parameters for better performance and security:
 
@@ -430,7 +529,7 @@ command.Parameters.Add("@customerName", SqlDbType.NVarChar).Value = "John";
 command.Parameters.Add("@minAge", SqlDbType.Int).Value = 18;
 ```
 
-### 15. Paging
+### 16. Paging
 
 Implementing pagination for large result sets:
 
@@ -455,7 +554,7 @@ int pageSize = 10;
 string sql = renderer.RenderPage(pageIndex, pageSize, totalRows, query);
 ```
 
-### 16. Subqueries
+### 17. Subqueries
 
 Using subqueries in WHERE clauses:
 
@@ -484,7 +583,7 @@ SqlServerRenderer renderer = new SqlServerRenderer();
 string sql = renderer.RenderSelect(query);
 ```
 
-### 17. EXISTS and NOT EXISTS
+### 18. EXISTS and NOT EXISTS
 
 Using EXISTS clauses:
 
@@ -514,7 +613,7 @@ string sql = renderer.RenderSelect(query);
 //         WHERE EXISTS (SELECT * FROM [orders] [o] WHERE [o].[customerId] = [c].[customerId])
 ```
 
-### 18. Cross-Tabs (Pivot Tables) - Advanced
+### 19. Cross-Tabs (Pivot Tables) - Advanced
 
 Creating dynamic pivot tables for reporting:
 
@@ -548,7 +647,7 @@ SqlServerRenderer renderer = new SqlServerRenderer();
 string sql = renderer.RenderSelect(pivotQuery);
 ```
 
-### 19. Cross-Tab Drill-Down - Advanced
+### 20. Cross-Tab Drill-Down - Advanced
 
 Drilling down into pivot table cells:
 
@@ -576,6 +675,13 @@ See [License.txt](License.txt) for license information.
 Contributions are welcome! If you find a bug or have a feature request, please open an issue on the project repository.
 
 ## Version History
+
+### 1.0.3
+- Attribute-based strongly-typed query building
+- New attributes: `[TableName]`, `[TableAlias]`, `[ColumnName]`, `[IgnoreColumn]`
+- Helper methods: `Table<T>()`, `Field<T>()`, `ColumnName<T>()`, `AddAllColumns<T>()`
+- Auto-aliasing when `[ColumnName]` differs from property name
+- `GenerateSelectQuery<T>()` for quick query scaffolding
 
 ### 1.0.2
 - Enhanced documentation with comprehensive examples
