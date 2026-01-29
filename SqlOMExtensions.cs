@@ -3,6 +3,37 @@ using System.Reflection;
 
 namespace Reeb.SqlOM;
 
+/// <summary>
+/// Generates unique table aliases, auto-incrementing on collision.
+/// Example: "a", "s", "w", "a2" (if "a" already used)
+/// </summary>
+public class AliasGenerator
+{
+    private readonly Dictionary<string, int> _used = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Gets a unique alias based on the type's first letter or [TableAlias] attribute.
+    /// </summary>
+    public string Next<T>() => GetUnique(SqlOMExtensions.TableAlias<T>());
+
+    /// <summary>
+    /// Gets a unique alias based on the provided base alias.
+    /// </summary>
+    public string Next(string baseAlias) => GetUnique(baseAlias);
+
+    private string GetUnique(string baseAlias)
+    {
+        if (!_used.TryGetValue(baseAlias, out var count))
+        {
+            _used[baseAlias] = 1;
+            return baseAlias;
+        }
+
+        _used[baseAlias] = count + 1;
+        return $"{baseAlias}{count + 1}";
+    }
+}
+
 public static class SqlOMExtensions
 {
     #region SqlConstantCollection Extensions
@@ -88,6 +119,14 @@ public static class SqlOMExtensions
     public static FromTerm Table<T>(string alias)
     {
         return FromTerm.Table(TableName<T>(), alias);
+    }
+
+    /// <summary>
+    /// Creates a FromTerm with auto-generated unique alias from the AliasGenerator.
+    /// </summary>
+    public static FromTerm Table<T>(AliasGenerator aliases)
+    {
+        return FromTerm.Table(TableName<T>(), aliases.Next<T>());
     }
 
     /// <summary>

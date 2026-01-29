@@ -20,12 +20,11 @@
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageTags>SQL;SQL-Generator;Query-Builder;Dynamic-SQL;Database;ORM;SQL-Server;Oracle;MySQL;MariaDB;SQLite</PackageTags>
     <PackageReleaseNotes>
-      Version 1.0.4 - Smart Pluralization and Navigation Detection
-      • TableName&lt;T&gt;() now auto-pluralizes (Activity → Activities)
-      • AddAllColumns&lt;T&gt;() auto-skips navigation properties and [NotMapped]
-      • Pluralize() helper for common English nouns
+      Version 1.0.5 - Automatic Alias Generation
+      • New AliasGenerator class for unique table aliases
+      • Table&lt;T&gt;(aliases) overload auto-increments on collision (a, a2, a3...)
     </PackageReleaseNotes>
-    <Version>1.0.4</Version>
+    <Version>1.0.5</Version>
     <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
   </PropertyGroup>
 

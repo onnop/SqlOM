@@ -29,7 +29,7 @@ dotnet add package SqlOM
 
 ### PackageReference
 ```xml
-<PackageReference Include="SqlOM" Version="1.0.4" />
+<PackageReference Include="SqlOM" Version="1.0.5" />
 ```
 
 ## Supported Databases
@@ -420,6 +420,21 @@ SelectQuery query = GenerateSelectQuery<CustomerRow>();
 SelectQuery query = GenerateSelectQuery<CustomerRow>("cust");
 ```
 
+#### Automatic Alias Generation
+
+When building complex queries with multiple tables, use `AliasGenerator` to automatically create unique aliases:
+
+```csharp
+var alias = new AliasGenerator();
+var tPhase = Table<Phase>(alias);           // alias: "p"
+var tSubphase = Table<Subphase>(alias);     // alias: "s"
+var tWorkPackage = Table<WorkPackage>(alias); // alias: "w"
+var tActivity = Table<Activity>(alias);     // alias: "a"
+var tStatus = Table<ActivityExecutionStatus>(alias); // alias: "a2" (collision with Activity)
+
+// All aliases are unique - no manual tracking needed
+```
+
 #### Available Attributes
 
 | Attribute | Target | Description |
@@ -435,9 +450,11 @@ SelectQuery query = GenerateSelectQuery<CustomerRow>("cust");
 |--------|-------------|
 | `Table<T>()` | Creates `FromTerm` using `[TableName]` and `[TableAlias]` |
 | `Table<T>(alias)` | Creates `FromTerm` with custom alias |
+| `Table<T>(AliasGenerator)` | Creates `FromTerm` with auto-generated unique alias |
 | `TableName<T>()` | Gets table name from attribute or auto-pluralized type name |
 | `TableAlias<T>()` | Gets alias from attribute or first letter |
 | `Pluralize(word)` | Pluralizes English nouns (Activity → Activities) |
+| `new AliasGenerator()` | Creates alias generator; auto-increments on collision |
 | `ColumnName<T>(x => x.Prop)` | Gets column name from `[ColumnName]` or property name |
 | `Field<T>(x => x.Prop, table)` | Creates `SqlExpression.Field` with correct column name |
 | `columns.Add<T>(x => x.Prop, table)` | Adds column with auto-aliasing |
@@ -676,6 +693,10 @@ See [License.txt](License.txt) for license information.
 Contributions are welcome! If you find a bug or have a feature request, please open an issue on the project repository.
 
 ## Version History
+
+### 1.0.5
+- New `AliasGenerator` class for automatic unique table alias generation
+- `Table<T>(AliasGenerator)` overload auto-increments on collision (a, a2, a3...)
 
 ### 1.0.4
 - `TableName<T>()` now auto-pluralizes type names (Activity → Activities)
