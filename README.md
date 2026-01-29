@@ -29,7 +29,7 @@ dotnet add package SqlOM
 
 ### PackageReference
 ```xml
-<PackageReference Include="SqlOM" Version="1.0.5" />
+<PackageReference Include="SqlOM" Version="1.0.6" />
 ```
 
 ## Supported Databases
@@ -693,7 +693,7 @@ Contributions are welcome! If you find a bug or have a feature request, please o
 
 ## Version History
 
-### 1.0.5
+### 1.0.6
 - All query constructors automatically reset alias tracking
 - `Table<T>()` auto-generates unique aliases (a, a2, a3... on collision)
 - `Table<T>("custom")` overload to override with explicit alias
