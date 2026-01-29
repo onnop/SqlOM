@@ -29,7 +29,7 @@ dotnet add package SqlOM
 
 ### PackageReference
 ```xml
-<PackageReference Include="SqlOM" Version="1.0.3" />
+<PackageReference Include="SqlOM" Version="1.0.4" />
 ```
 
 ## Supported Databases
@@ -435,12 +435,13 @@ SelectQuery query = GenerateSelectQuery<CustomerRow>("cust");
 |--------|-------------|
 | `Table<T>()` | Creates `FromTerm` using `[TableName]` and `[TableAlias]` |
 | `Table<T>(alias)` | Creates `FromTerm` with custom alias |
-| `TableName<T>()` | Gets table name from attribute or type name |
+| `TableName<T>()` | Gets table name from attribute or auto-pluralized type name |
 | `TableAlias<T>()` | Gets alias from attribute or first letter |
+| `Pluralize(word)` | Pluralizes English nouns (Activity → Activities) |
 | `ColumnName<T>(x => x.Prop)` | Gets column name from `[ColumnName]` or property name |
 | `Field<T>(x => x.Prop, table)` | Creates `SqlExpression.Field` with correct column name |
 | `columns.Add<T>(x => x.Prop, table)` | Adds column with auto-aliasing |
-| `columns.AddAllColumns<T>(table)` | Adds all non-ignored properties |
+| `columns.AddAllColumns<T>(table)` | Adds columns, auto-skips navigation/[NotMapped] |
 | `GenerateSelectQuery<T>()` | Creates query with all columns from type |
 
 ### 13. CASE Expressions (Advanced)
@@ -675,6 +676,12 @@ See [License.txt](License.txt) for license information.
 Contributions are welcome! If you find a bug or have a feature request, please open an issue on the project repository.
 
 ## Version History
+
+### 1.0.4
+- `TableName<T>()` now auto-pluralizes type names (Activity → Activities)
+- `AddAllColumns<T>()` auto-skips navigation properties and `[NotMapped]`
+- New `Pluralize()` helper for common English noun pluralization
+- No need to add `[IgnoreColumn]` to navigation properties
 
 ### 1.0.3
 - Attribute-based strongly-typed query building

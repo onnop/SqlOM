@@ -22,13 +22,46 @@ public static class SqlOMExtensions
     #region Table/Column Name Helpers
 
     /// <summary>
-    /// Gets the table name for a type, using [TableName] attribute or type name.
+    /// Gets the table name for a type, using [TableName] attribute or pluralized type name.
     /// </summary>
-    public static string TableName<T>()
+    /// <param name="pluralize">If true and no [TableName] attribute, pluralizes the type name (default: true).</param>
+    public static string TableName<T>(bool pluralize = true)
     {
         var type = typeof(T);
         var attr = type.GetCustomAttribute<TableNameAttribute>();
-        return attr?.Name ?? type.Name;
+        if (attr != null)
+            return attr.Name;
+        
+        return pluralize ? Pluralize(type.Name) : type.Name;
+    }
+
+    /// <summary>
+    /// Simple pluralization for common English nouns.
+    /// Handles: -y → -ies, -s/-x/-z/-ch/-sh → -es, default → -s
+    /// </summary>
+    public static string Pluralize(string word)
+    {
+        if (string.IsNullOrEmpty(word))
+            return word;
+
+        // Words ending in consonant + y → ies
+        if (word.EndsWith('y') && word.Length > 1)
+        {
+            var beforeY = word[^2];
+            if (!"aeiouAEIOU".Contains(beforeY))
+                return word[..^1] + "ies";
+        }
+
+        // Words ending in s, x, z, ch, sh → es
+        if (word.EndsWith('s') || word.EndsWith('x') || word.EndsWith('z') ||
+            word.EndsWith("ch", StringComparison.Ordinal) || 
+            word.EndsWith("sh", StringComparison.Ordinal))
+        {
+            return word + "es";
+        }
+
+        // Default: add s
+        return word + "s";
     }
 
     /// <summary>
@@ -110,13 +143,14 @@ public static class SqlOMExtensions
 
     /// <summary>
     /// Adds all non-ignored properties from a type as columns.
+    /// Automatically ignores: [IgnoreColumn], [NotMapped], navigation properties (non-primitive reference types).
     /// </summary>
     public static void AddAllColumns<T>(
         this SelectColumnCollection columns,
         FromTerm table)
     {
         var properties = typeof(T).GetProperties(BindingFlags.Instance | BindingFlags.Public)
-            .Where(p => p.GetCustomAttribute<IgnoreColumnAttribute>() == null)
+            .Where(p => !ShouldIgnoreProperty(p))
             .GroupBy(p => p.Name)
             .Select(g => g.First());
 
@@ -126,6 +160,60 @@ public static class SqlOMExtensions
             var columnName = columnAttr?.Name ?? prop.Name;
             columns.Add(new SelectColumn(columnName, table));
         }
+    }
+
+    /// <summary>
+    /// Determines if a property should be ignored when building queries.
+    /// </summary>
+    private static bool ShouldIgnoreProperty(PropertyInfo prop)
+    {
+        // Explicit [IgnoreColumn] attribute
+        if (prop.GetCustomAttribute<IgnoreColumnAttribute>() != null)
+            return true;
+
+        // EF Core [NotMapped] attribute (check by name to avoid hard dependency)
+        if (prop.CustomAttributes.Any(a => a.AttributeType.Name == "NotMappedAttribute"))
+            return true;
+
+        // Skip navigation properties (reference types except string, byte[], primitives)
+        var propType = prop.PropertyType;
+        if (IsNavigationProperty(propType))
+            return true;
+
+        return false;
+    }
+
+    /// <summary>
+    /// Checks if a type represents a navigation property (should be ignored in column generation).
+    /// </summary>
+    private static bool IsNavigationProperty(Type type)
+    {
+        // Nullable<T> - check underlying type
+        var underlyingType = Nullable.GetUnderlyingType(type);
+        if (underlyingType != null)
+            type = underlyingType;
+
+        // Primitives, enums, value types are columns
+        if (type.IsPrimitive || type.IsEnum || type.IsValueType)
+            return false;
+
+        // String and byte[] are columns
+        if (type == typeof(string) || type == typeof(byte[]))
+            return false;
+
+        // Common value-like types
+        if (type == typeof(DateTime) || type == typeof(DateTimeOffset) || 
+            type == typeof(TimeSpan) || type == typeof(Guid) || type == typeof(decimal))
+            return false;
+
+        // Collections are navigation properties
+        if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(ICollection<>))
+            return true;
+        if (typeof(System.Collections.IEnumerable).IsAssignableFrom(type) && type != typeof(string))
+            return true;
+
+        // Other reference types are likely navigation properties
+        return type.IsClass;
     }
 
     #endregion
