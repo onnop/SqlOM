@@ -73,18 +73,30 @@ public static class SqlOMExtensions
 
     /// <summary>
     /// Adds a column to the query using a property expression.
+    /// Auto-aliases when [ColumnName] differs from property name (for Dapper mapping).
     /// </summary>
     public static void Add<T>(
         this SelectColumnCollection columns,
         Expression<Func<T, object?>> expression,
         FromTerm table)
     {
-        var columnName = ColumnName(expression);
-        columns.Add(new SelectColumn(columnName, table));
+        var propertyInfo = GetPropertyInfo(expression);
+        var columnAttr = propertyInfo.GetCustomAttribute<ColumnNameAttribute>();
+        var columnName = columnAttr?.Name ?? propertyInfo.Name;
+        
+        // Auto-alias when column name differs from property name
+        if (columnAttr != null && columnAttr.Name != propertyInfo.Name)
+        {
+            columns.Add(new SelectColumn(columnName, table, propertyInfo.Name));
+        }
+        else
+        {
+            columns.Add(new SelectColumn(columnName, table));
+        }
     }
 
     /// <summary>
-    /// Adds a column to the query with an alias.
+    /// Adds a column to the query with an explicit alias (overrides auto-alias).
     /// </summary>
     public static void Add<T>(
         this SelectColumnCollection columns,
