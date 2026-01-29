@@ -20,12 +20,13 @@
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageTags>SQL;SQL-Generator;Query-Builder;Dynamic-SQL;Database;ORM;SQL-Server;Oracle;MySQL;MariaDB;SQLite</PackageTags>
     <PackageReleaseNotes>
-      Version 1.0.6 - Automatic Alias Generation (Final)
-      • All query constructors automatically reset alias tracking
-      • Table&lt;T&gt;() auto-generates unique aliases (a, a2, a3... on collision)
-      • Table&lt;T&gt;("custom") to override with explicit alias
+      Version 1.0.8 - API cleanup
+      • SqlOMExtensions is now internal - all methods moved to core classes
+      • SelectColumnCollection.Add&lt;T&gt;() and AddAllColumns&lt;T&gt;() are now instance methods
+      • SelectQuery.For&lt;T&gt;() factory method for quick typed query creation
+      • SqlConstantCollection.FromGuids() factory method
     </PackageReleaseNotes>
-    <Version>1.0.6</Version>
+    <Version>1.0.8</Version>
     <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
   </PropertyGroup>
 

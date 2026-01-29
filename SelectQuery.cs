@@ -128,6 +128,17 @@ namespace Reeb.SqlOM;
         }
 
         /// <summary>
+        /// Creates a SelectQuery for a type, with all non-ignored columns selected.
+        /// </summary>
+        public static SelectQuery For<T>(string? alias = null)
+        {
+            var table = alias != null ? FromTerm.Table<T>(alias) : FromTerm.Table<T>();
+            var query = new SelectQuery(table);
+            query.Columns.AddAllColumns<T>(table);
+            return query;
+        }
+
+        /// <summary>
         /// Gets the FROM definition for this SelectQuery
         /// </summary>
         public FromClause FromClause

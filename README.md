@@ -29,7 +29,7 @@ dotnet add package SqlOM
 
 ### PackageReference
 ```xml
-<PackageReference Include="SqlOM" Version="1.0.6" />
+<PackageReference Include="SqlOM" Version="1.0.8" />
 ```
 
 ## Supported Databases
@@ -449,16 +449,13 @@ var tCustom = Table<Phase>("custom");  // explicit alias
 
 | Method | Description |
 |--------|-------------|
-| `Table<T>()` | Creates `FromTerm` with auto-generated unique alias |
-| `Table<T>(alias)` | Creates `FromTerm` with explicit alias (overrides auto-generation) |
-| `TableName<T>()` | Gets table name from attribute or auto-pluralized type name |
-| `TableAlias<T>()` | Gets base alias from attribute or first letter |
-| `Pluralize(word)` | Pluralizes English nouns (Activity → Activities) |
-| `ColumnName<T>(x => x.Prop)` | Gets column name from `[ColumnName]` or property name |
-| `Field<T>(x => x.Prop, table)` | Creates `SqlExpression.Field` with correct column name |
+| `FromTerm.Table<T>()` | Creates `FromTerm` with auto-generated unique alias |
+| `FromTerm.Table<T>(alias)` | Creates `FromTerm` with explicit alias |
+| `SqlExpression.Field<T>(x => x.Prop, table)` | Creates field with correct column name |
+| `SelectQuery.For<T>()` | Creates query with all columns from type |
 | `columns.Add<T>(x => x.Prop, table)` | Adds column with auto-aliasing |
-| `columns.AddAllColumns<T>(table)` | Adds columns, auto-skips navigation/[NotMapped] |
-| `GenerateSelectQuery<T>()` | Creates query with all columns from type |
+| `columns.AddAllColumns<T>(table)` | Adds all columns, auto-skips navigation/[NotMapped] |
+| `SqlConstantCollection.FromGuids(list)` | Creates constants from Guid list |
 
 ### 13. CASE Expressions (Advanced)
 
@@ -693,10 +690,14 @@ Contributions are welcome! If you find a bug or have a feature request, please o
 
 ## Version History
 
-### 1.0.6
+### 1.0.8
+- `SelectColumnCollection.Add<T>()` and `AddAllColumns<T>()` are now instance methods
+- `SelectQuery.For<T>()` factory method for quick typed query creation
+- `SqlConstantCollection.FromGuids()` factory method
+
+### 1.0.7
 - All query constructors automatically reset alias tracking
 - `Table<T>()` auto-generates unique aliases (a, a2, a3... on collision)
-- `Table<T>("custom")` overload to override with explicit alias
 
 ### 1.0.4
 - `TableName<T>()` now auto-pluralizes type names (Activity → Activities)

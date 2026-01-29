@@ -325,6 +325,15 @@ internal enum SqlExpressionType
         }
 
         /// <summary>
+        /// Creates a SqlExpression for a typed property field.
+        /// Uses [ColumnName] attribute or property name.
+        /// </summary>
+        public static SqlExpression Field<T>(System.Linq.Expressions.Expression<Func<T, object?>> expression, FromTerm table)
+        {
+            return Field(SqlOMExtensions.ColumnName<T>(expression), table);
+        }
+
+        /// <summary>
         /// Creates a SqlExpression with a CASE statement.
         /// </summary>
         /// <param name="caseClause"></param>

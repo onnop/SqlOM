@@ -126,6 +126,23 @@ namespace Reeb.SqlOM
             return term;
         }
 
+        /// <summary>
+        /// Creates a FromTerm for a type with auto-generated unique alias.
+        /// Uses [TableName] attribute or pluralized type name, and auto-increments alias on collision.
+        /// </summary>
+        public static FromTerm Table<T>()
+        {
+            return Table(SqlOMExtensions.TableName<T>(), SqlOMExtensions.GetUniqueAlias(SqlOMExtensions.TableAlias<T>()));
+        }
+
+        /// <summary>
+        /// Creates a FromTerm for a type with explicit alias.
+        /// </summary>
+        public static FromTerm Table<T>(string alias)
+        {
+            return Table(SqlOMExtensions.TableName<T>(), alias);
+        }
+
         public static FromTerm Function(string functionName, params string[] arguments)
         {
             string functionCall = GetFunctionCallString(functionName, arguments);

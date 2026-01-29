@@ -16,6 +16,19 @@ namespace Reeb.SqlOM
         }
 
         /// <summary>
+        /// Creates a SqlConstantCollection from a list of Guids.
+        /// </summary>
+        public static SqlConstantCollection FromGuids(IEnumerable<Guid> values)
+        {
+            var collection = new SqlConstantCollection();
+            foreach (var value in values)
+            {
+                collection.Add(SqlConstant.Guid(value));
+            }
+            return collection;
+        }
+
+        /// <summary>
         /// Initializes a new empty instance of the SqlConstantCollection class with the specified initial capacity
         /// </summary>
         public SqlConstantCollection(int capacity)

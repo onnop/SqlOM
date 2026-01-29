@@ -1,4 +1,6 @@
 using System.Collections;
+using System.Linq.Expressions;
+using System.Reflection;
 
 namespace Reeb.SqlOM
 {
@@ -76,6 +78,85 @@ namespace Reeb.SqlOM
         public virtual void Add(SelectColumn value)
         {
             this.List.Add(value);
+        }
+
+        /// <summary>
+        /// Adds a column using a property expression.
+        /// Auto-aliases when [ColumnName] differs from property name (for Dapper mapping).
+        /// </summary>
+        public void Add<T>(Expression<Func<T, object?>> expression, FromTerm table)
+        {
+            var propertyInfo = GetPropertyInfo(expression);
+            var columnAttr = propertyInfo.GetCustomAttribute<ColumnNameAttribute>();
+            var columnName = columnAttr?.Name ?? propertyInfo.Name;
+
+            if (columnAttr != null && columnAttr.Name != propertyInfo.Name)
+            {
+                this.Add(new SelectColumn(columnName, table, propertyInfo.Name));
+            }
+            else
+            {
+                this.Add(new SelectColumn(columnName, table));
+            }
+        }
+
+        /// <summary>
+        /// Adds a column with an explicit alias (overrides auto-alias).
+        /// </summary>
+        public void Add<T>(Expression<Func<T, object?>> expression, FromTerm table, string alias)
+        {
+            var propertyInfo = GetPropertyInfo(expression);
+            var columnAttr = propertyInfo.GetCustomAttribute<ColumnNameAttribute>();
+            var columnName = columnAttr?.Name ?? propertyInfo.Name;
+            this.Add(new SelectColumn(columnName, table, alias));
+        }
+
+        /// <summary>
+        /// Adds all non-ignored properties from a type as columns.
+        /// Automatically ignores: [IgnoreColumn], [NotMapped], navigation properties.
+        /// </summary>
+        public void AddAllColumns<T>(FromTerm table)
+        {
+            var properties = typeof(T).GetProperties(BindingFlags.Instance | BindingFlags.Public)
+                .Where(p => !ShouldIgnoreProperty(p))
+                .GroupBy(p => p.Name)
+                .Select(g => g.First());
+
+            foreach (var prop in properties)
+            {
+                var columnAttr = prop.GetCustomAttribute<ColumnNameAttribute>();
+                var columnName = columnAttr?.Name ?? prop.Name;
+                this.Add(new SelectColumn(columnName, table));
+            }
+        }
+
+        private static PropertyInfo GetPropertyInfo<T>(Expression<Func<T, object?>> expression)
+        {
+            MemberExpression? member = expression.Body as MemberExpression;
+            if (member == null && expression.Body is UnaryExpression unary)
+            {
+                member = unary.Operand as MemberExpression;
+            }
+            return member?.Member as PropertyInfo ?? throw new ArgumentException("Expression must be a property access");
+        }
+
+        private static bool ShouldIgnoreProperty(PropertyInfo prop)
+        {
+            if (prop.GetCustomAttribute<IgnoreColumnAttribute>() != null) return true;
+            if (prop.CustomAttributes.Any(a => a.AttributeType.Name == "NotMappedAttribute")) return true;
+            return IsNavigationProperty(prop.PropertyType);
+        }
+
+        private static bool IsNavigationProperty(Type type)
+        {
+            var underlyingType = Nullable.GetUnderlyingType(type);
+            if (underlyingType != null) type = underlyingType;
+            if (type.IsPrimitive || type.IsEnum || type.IsValueType) return false;
+            if (type == typeof(string) || type == typeof(byte[])) return false;
+            if (type == typeof(DateTime) || type == typeof(DateTimeOffset) ||
+                type == typeof(TimeSpan) || type == typeof(Guid) || type == typeof(decimal)) return false;
+            if (typeof(System.Collections.IEnumerable).IsAssignableFrom(type) && type != typeof(string)) return true;
+            return type.IsClass;
         }
 
         /// <summary>
