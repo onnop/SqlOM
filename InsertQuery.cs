@@ -34,18 +34,19 @@ namespace Reeb.SqlOM
         private string SQL { get { return new Render.SqlServerRenderer().RenderInsert(this); } }
 
         /// <summary>
-        /// Create an InsertQuery
+        /// Create an InsertQuery and resets alias tracking for Table&lt;T&gt;().
         /// </summary>
         public InsertQuery() : this(null)
         {
         }
 
         /// <summary>
-        /// Create an InsertQuery
+        /// Create an InsertQuery and resets alias tracking for Table&lt;T&gt;().
         /// </summary>
         /// <param name="tableName">The name of the table to be inseserted into</param>
         public InsertQuery(string tableName)
         {
+            SqlOMExtensions.ResetAliases();
             this.tableName = tableName;
         }
 

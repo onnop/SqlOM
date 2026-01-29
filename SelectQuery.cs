@@ -102,25 +102,28 @@ namespace Reeb.SqlOM;
         int pageSize = 0;
 
         /// <summary>
-        /// Creates a new SelectQuery
+        /// Creates a new SelectQuery and resets alias tracking for Table&lt;T&gt;().
         /// </summary>
         public SelectQuery()
         {
+            SqlOMExtensions.ResetAliases();
         }
 
         /// <summary>
-        /// Creates a new SelectQuery
+        /// Creates a new SelectQuery and resets alias tracking for Table&lt;T&gt;().
         /// </summary>
         public SelectQuery(FromTerm baseTable)
         {
+            SqlOMExtensions.ResetAliases();
             FromClause.BaseTable = baseTable;
         }
 
         /// <summary>
-        /// Creates a new SelectQuery
+        /// Creates a new SelectQuery and resets alias tracking for Table&lt;T&gt;().
         /// </summary>
         public SelectQuery(string tableName)
         {
+            SqlOMExtensions.ResetAliases();
             FromClause.BaseTable = FromTerm.Table(tableName);
         }
 

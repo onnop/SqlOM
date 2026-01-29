@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 
 namespace Reeb.SqlOM
 {
@@ -43,18 +43,19 @@ namespace Reeb.SqlOM
         private string SQL { get { return new Render.SqlServerRenderer().RenderBulkInsert(this); } }
 
         /// <summary>
-        /// Create an BulkInsertQuery
+        /// Create a BulkInsertQuery and resets alias tracking for Table&lt;T&gt;().
         /// </summary>
         public BulkInsertQuery() : this(null)
         {
         }
 
         /// <summary>
-        /// Create an BulkInsertQuery
+        /// Create a BulkInsertQuery and resets alias tracking for Table&lt;T&gt;().
         /// </summary>
         /// <param name="tableName">The name of the table to be inserted into</param>
         public BulkInsertQuery(string tableName)
         {
+            SqlOMExtensions.ResetAliases();
             this.tableName = tableName;
         }
 

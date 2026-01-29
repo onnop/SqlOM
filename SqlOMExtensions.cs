@@ -3,39 +3,41 @@ using System.Reflection;
 
 namespace Reeb.SqlOM;
 
-/// <summary>
-/// Generates unique table aliases, auto-incrementing on collision.
-/// Example: "a", "s", "w", "a2" (if "a" already used)
-/// </summary>
-public class AliasGenerator
+public static class SqlOMExtensions
 {
-    private readonly Dictionary<string, int> _used = new(StringComparer.OrdinalIgnoreCase);
+    // Thread-safe alias tracking per async context
+    private static readonly AsyncLocal<Dictionary<string, int>?> _aliasContext = new();
 
     /// <summary>
-    /// Gets a unique alias based on the type's first letter or [TableAlias] attribute.
+    /// Resets alias tracking. Called automatically by SelectQuery constructor.
     /// </summary>
-    public string Next<T>() => GetUnique(SqlOMExtensions.TableAlias<T>());
-
-    /// <summary>
-    /// Gets a unique alias based on the provided base alias.
-    /// </summary>
-    public string Next(string baseAlias) => GetUnique(baseAlias);
-
-    private string GetUnique(string baseAlias)
+    internal static void ResetAliases()
     {
-        if (!_used.TryGetValue(baseAlias, out var count))
+        _aliasContext.Value = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// Gets a unique alias, auto-incrementing on collision.
+    /// </summary>
+    private static string GetUniqueAlias(string baseAlias)
+    {
+        var context = _aliasContext.Value;
+        if (context == null)
         {
-            _used[baseAlias] = 1;
+            // No context - just return base alias (first call or context not initialized)
+            _aliasContext.Value = context = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        }
+
+        if (!context.TryGetValue(baseAlias, out var count))
+        {
+            context[baseAlias] = 1;
             return baseAlias;
         }
 
-        _used[baseAlias] = count + 1;
+        context[baseAlias] = count + 1;
         return $"{baseAlias}{count + 1}";
     }
-}
 
-public static class SqlOMExtensions
-{
     #region SqlConstantCollection Extensions
 
     public static SqlConstantCollection ToSqlConstantCollection(this List<Guid> values)
@@ -106,27 +108,23 @@ public static class SqlOMExtensions
     }
 
     /// <summary>
-    /// Creates a FromTerm for a type using its [TableName] and [TableAlias] attributes.
+    /// Creates a FromTerm for a type with auto-generated unique alias.
+    /// Aliases are tracked per async context and auto-increment on collision (a, a2, a3...).
+    /// Call ResetAliases() at the start of each query builder to reset tracking.
     /// </summary>
     public static FromTerm Table<T>()
     {
-        return FromTerm.Table(TableName<T>(), TableAlias<T>());
+        var baseAlias = TableAlias<T>();
+        return FromTerm.Table(TableName<T>(), GetUniqueAlias(baseAlias));
     }
 
     /// <summary>
-    /// Creates a FromTerm for a type with a custom alias.
+    /// Creates a FromTerm for a type with a custom alias (no auto-increment).
+    /// Use this to override the automatic alias generation.
     /// </summary>
     public static FromTerm Table<T>(string alias)
     {
         return FromTerm.Table(TableName<T>(), alias);
-    }
-
-    /// <summary>
-    /// Creates a FromTerm with auto-generated unique alias from the AliasGenerator.
-    /// </summary>
-    public static FromTerm Table<T>(AliasGenerator aliases)
-    {
-        return FromTerm.Table(TableName<T>(), aliases.Next<T>());
     }
 
     /// <summary>

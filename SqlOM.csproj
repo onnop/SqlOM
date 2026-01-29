@@ -21,8 +21,9 @@
     <PackageTags>SQL;SQL-Generator;Query-Builder;Dynamic-SQL;Database;ORM;SQL-Server;Oracle;MySQL;MariaDB;SQLite</PackageTags>
     <PackageReleaseNotes>
       Version 1.0.5 - Automatic Alias Generation
-      • New AliasGenerator class for unique table aliases
-      • Table&lt;T&gt;(aliases) overload auto-increments on collision (a, a2, a3...)
+      • All query constructors automatically reset alias tracking
+      • Table&lt;T&gt;() auto-generates unique aliases (a, a2, a3... on collision)
+      • Table&lt;T&gt;("custom") to override with explicit alias
     </PackageReleaseNotes>
     <Version>1.0.5</Version>
     <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>

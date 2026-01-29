@@ -34,18 +34,19 @@ namespace Reeb.SqlOM
         private string SQL { get { return new Render.SqlServerRenderer().RenderUpdate(this); } }
 
         /// <summary>
-        /// Creates a new UpdateQuery
+        /// Creates a new UpdateQuery and resets alias tracking for Table&lt;T&gt;().
         /// </summary>
         public UpdateQuery() : this(null)
         {
         }
 
         /// <summary>
-        /// Creates a new UpdateQuery
+        /// Creates a new UpdateQuery and resets alias tracking for Table&lt;T&gt;().
         /// </summary>
         /// <param name="tableName"></param>
         public UpdateQuery(string tableName)
         {
+            SqlOMExtensions.ResetAliases();
             this.tableName = tableName;
         }
 

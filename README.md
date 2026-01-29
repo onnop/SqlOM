@@ -422,17 +422,18 @@ SelectQuery query = GenerateSelectQuery<CustomerRow>("cust");
 
 #### Automatic Alias Generation
 
-When building complex queries with multiple tables, use `AliasGenerator` to automatically create unique aliases:
+All query constructors (`SelectQuery`, `UpdateQuery`, `DeleteQuery`, `InsertQuery`, `BulkInsertQuery`) automatically reset alias tracking. `Table<T>()` then auto-generates unique aliases:
 
 ```csharp
-var alias = new AliasGenerator();
-var tPhase = Table<Phase>(alias);           // alias: "p"
-var tSubphase = Table<Subphase>(alias);     // alias: "s"
-var tWorkPackage = Table<WorkPackage>(alias); // alias: "w"
-var tActivity = Table<Activity>(alias);     // alias: "a"
-var tStatus = Table<ActivityExecutionStatus>(alias); // alias: "a2" (collision with Activity)
+var query = new SelectQuery();  // resets aliases automatically
+var tPhase = Table<Phase>();           // alias: "p"
+var tSubphase = Table<Subphase>();     // alias: "s"
+var tWorkPackage = Table<WorkPackage>(); // alias: "w"
+var tActivity = Table<Activity>();     // alias: "a"
+var tStatus = Table<ActivityExecutionStatus>(); // alias: "a2" (auto-incremented)
 
-// All aliases are unique - no manual tracking needed
+// Override if needed
+var tCustom = Table<Phase>("custom");  // explicit alias
 ```
 
 #### Available Attributes
@@ -448,13 +449,11 @@ var tStatus = Table<ActivityExecutionStatus>(alias); // alias: "a2" (collision w
 
 | Method | Description |
 |--------|-------------|
-| `Table<T>()` | Creates `FromTerm` using `[TableName]` and `[TableAlias]` |
-| `Table<T>(alias)` | Creates `FromTerm` with custom alias |
-| `Table<T>(AliasGenerator)` | Creates `FromTerm` with auto-generated unique alias |
+| `Table<T>()` | Creates `FromTerm` with auto-generated unique alias |
+| `Table<T>(alias)` | Creates `FromTerm` with explicit alias (overrides auto-generation) |
 | `TableName<T>()` | Gets table name from attribute or auto-pluralized type name |
-| `TableAlias<T>()` | Gets alias from attribute or first letter |
+| `TableAlias<T>()` | Gets base alias from attribute or first letter |
 | `Pluralize(word)` | Pluralizes English nouns (Activity → Activities) |
-| `new AliasGenerator()` | Creates alias generator; auto-increments on collision |
 | `ColumnName<T>(x => x.Prop)` | Gets column name from `[ColumnName]` or property name |
 | `Field<T>(x => x.Prop, table)` | Creates `SqlExpression.Field` with correct column name |
 | `columns.Add<T>(x => x.Prop, table)` | Adds column with auto-aliasing |
@@ -695,8 +694,9 @@ Contributions are welcome! If you find a bug or have a feature request, please o
 ## Version History
 
 ### 1.0.5
-- New `AliasGenerator` class for automatic unique table alias generation
-- `Table<T>(AliasGenerator)` overload auto-increments on collision (a, a2, a3...)
+- All query constructors automatically reset alias tracking
+- `Table<T>()` auto-generates unique aliases (a, a2, a3... on collision)
+- `Table<T>("custom")` overload to override with explicit alias
 
 ### 1.0.4
 - `TableName<T>()` now auto-pluralizes type names (Activity → Activities)

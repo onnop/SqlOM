@@ -31,18 +31,19 @@ namespace Reeb.SqlOM
         private string SQL { get { return new Render.SqlServerRenderer().RenderDelete(this); } }
 
         /// <summary>
-        /// Creates a DeleteQuery
+        /// Creates a DeleteQuery and resets alias tracking for Table&lt;T&gt;().
         /// </summary>
         public DeleteQuery() : this(null)
         {
         }
 
         /// <summary>
-        /// Creates a DeleteQuery
+        /// Creates a DeleteQuery and resets alias tracking for Table&lt;T&gt;().
         /// </summary>
         /// <param name="tableName">Name of the table records are to be deleted from</param>
         public DeleteQuery(string tableName)
         {
+            SqlOMExtensions.ResetAliases();
             this.tableName = tableName;
         }
 
