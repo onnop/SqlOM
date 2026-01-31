@@ -20,13 +20,16 @@
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageTags>SQL;SQL-Generator;Query-Builder;Dynamic-SQL;Database;ORM;SQL-Server;Oracle;MySQL;MariaDB;SQLite</PackageTags>
     <PackageReleaseNotes>
-      Version 1.0.8 - API cleanup
-      • SqlOMExtensions is now internal - all methods moved to core classes
-      • SelectColumnCollection.Add&lt;T&gt;() and AddAllColumns&lt;T&gt;() are now instance methods
-      • SelectQuery.For&lt;T&gt;() factory method for quick typed query creation
-      • SqlConstantCollection.FromGuids() factory method
+      Version 1.0.9 - Public extension methods for static imports
+      • SqlOMExtensions class is now public to support 'using static Reeb.SqlOM.SqlOMExtensions'
+      • Added convenience methods for static import usage:
+        - Table&lt;T&gt;() - creates a FromTerm for a typed table
+        - Table&lt;T&gt;(string alias) - creates a FromTerm with custom alias
+        - Field&lt;T&gt;(expression, table) - creates a SqlExpression for a field
+        - ColumnName&lt;T&gt;(expression) - gets the column name from attribute or property name
+      • Enables cleaner query building syntax in consuming projects
     </PackageReleaseNotes>
-    <Version>1.0.8</Version>
+    <Version>1.0.9</Version>
     <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
   </PropertyGroup>
 

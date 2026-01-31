@@ -4,9 +4,9 @@ using System.Reflection;
 namespace Reeb.SqlOM;
 
 /// <summary>
-/// Internal helper methods for SqlOM strongly-typed query building.
+/// Helper methods for SqlOM strongly-typed query building.
 /// </summary>
-internal static class SqlOMExtensions
+public static class SqlOMExtensions
 {
     private static readonly AsyncLocal<Dictionary<string, int>?> _aliasContext = new();
 
@@ -84,15 +84,6 @@ internal static class SqlOMExtensions
         return attr?.Alias ?? type.Name[..1].ToLowerInvariant();
     }
 
-    /// <summary>
-    /// Gets the column name for a property, using [ColumnName] attribute or property name.
-    /// </summary>
-    internal static string ColumnName<T>(Expression<Func<T, object?>> expression)
-    {
-        var propertyInfo = GetPropertyInfo(expression);
-        var attr = propertyInfo.GetCustomAttribute<ColumnNameAttribute>();
-        return attr?.Name ?? propertyInfo.Name;
-    }
 
     internal static PropertyInfo GetPropertyInfo<T>(Expression<Func<T, object?>> expression)
     {
@@ -109,4 +100,38 @@ internal static class SqlOMExtensions
 
         throw new ArgumentException("Expression must be a property access expression", nameof(expression));
     }
+
+    #region Public Convenience Methods (for use with 'using static')
+
+    /// <summary>
+    /// Creates a FromTerm for a table using the type's [TableName] attribute or pluralized type name.
+    /// Convenience method for use with 'using static Reeb.SqlOM.SqlOMExtensions;'
+    /// </summary>
+    public static FromTerm Table<T>() => FromTerm.Table<T>();
+
+    /// <summary>
+    /// Creates a FromTerm for a table with a specified alias.
+    /// Convenience method for use with 'using static Reeb.SqlOM.SqlOMExtensions;'
+    /// </summary>
+    public static FromTerm Table<T>(string alias) => FromTerm.Table<T>(alias);
+
+    /// <summary>
+    /// Creates a SqlExpression for a field using a property expression.
+    /// Convenience method for use with 'using static Reeb.SqlOM.SqlOMExtensions;'
+    /// </summary>
+    public static SqlExpression Field<T>(Expression<Func<T, object?>> expression, FromTerm table)
+        => SqlExpression.Field(expression, table);
+
+    /// <summary>
+    /// Gets the column name for a property, using [ColumnName] attribute or property name.
+    /// Public version for use with 'using static Reeb.SqlOM.SqlOMExtensions;'
+    /// </summary>
+    public static string ColumnName<T>(Expression<Func<T, object?>> expression)
+    {
+        var propertyInfo = GetPropertyInfo(expression);
+        var attr = propertyInfo.GetCustomAttribute<ColumnNameAttribute>();
+        return attr?.Name ?? propertyInfo.Name;
+    }
+
+    #endregion
 }
