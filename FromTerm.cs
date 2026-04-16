@@ -59,10 +59,10 @@ namespace Reeb.SqlOM
     /// </example>
     public class FromTerm
     {
-        object expr;
-        string alias;
+        object? expr;
+        string? alias;
         FromTermType type;
-        string ns1, ns2;
+        string? ns1, ns2;
         bool renderIdentifierQuotes = true;
         private LockHintType lockHint = LockHintType.NONE;
 
@@ -240,7 +240,7 @@ namespace Reeb.SqlOM
         /// The value of this property depends on the type of term. It will be table name
         /// for Table terms, SQL for SubQueries or null for TermRefs.
         /// </remarks>
-        internal object Expression
+        internal object? Expression
         {
             get { return expr; }
         }
@@ -249,7 +249,7 @@ namespace Reeb.SqlOM
         /// Gets the alias of the term.
         /// </summary>
         /// <remarks>This property can be null for some types of FromTerm</remarks>
-        internal string Alias
+        internal string? Alias
         {
             get { return alias; }
         }
@@ -276,7 +276,7 @@ namespace Reeb.SqlOM
         /// </summary>
         public string RefName
         {
-            get { return (alias == null && type == FromTermType.Table) ? (string)expr : alias; }
+            get { return (alias == null && type == FromTermType.Table) ? (string)expr! : alias!; }
         }
 
         public LockHintType LockHint
@@ -285,12 +285,12 @@ namespace Reeb.SqlOM
             set { lockHint = value; }
         }
 
-        internal string Ns1
+        internal string? Ns1
         {
             get { return this.ns1; }
         }
 
-        internal string Ns2
+        internal string? Ns2
         {
             get { return this.ns2; }
         }

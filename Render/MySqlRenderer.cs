@@ -50,6 +50,12 @@ namespace Reeb.SqlOM.Render
 
             StringBuilder selectBuilder = new StringBuilder();
 
+            // Render CTEs if any
+            if (query.CommonTableExpressions.Count > 0)
+            {
+                RenderCommonTableExpressions(selectBuilder, query.CommonTableExpressions);
+            }
+
             //Start the select statement
             this.Select(selectBuilder, query.Distinct);
 

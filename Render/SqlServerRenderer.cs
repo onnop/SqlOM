@@ -113,6 +113,12 @@ public class SqlServerRenderer : SqlOmRenderer
 
             StringBuilder selectBuilder = new();
 
+            // Render CTEs if any
+            if (workingQuery.CommonTableExpressions.Count > 0)
+            {
+                RenderCommonTableExpressions(selectBuilder, workingQuery.CommonTableExpressions);
+            }
+
             //Start the select statement
             Select(selectBuilder, workingQuery.Distinct);
 

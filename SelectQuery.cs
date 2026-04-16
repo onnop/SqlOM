@@ -92,6 +92,7 @@ namespace Reeb.SqlOM;
 
         OrderByTermCollection orderByTerms = new();
         GroupByTermCollection groupByTerms = new();
+        CommonTableExpressionCollection commonTableExpressions = new();
 
         int top = -1;
         bool groupByWithRollup = false;
@@ -152,6 +153,14 @@ namespace Reeb.SqlOM;
         public GroupByTermCollection GroupByTerms
         {
             get { return groupByTerms; }
+        }
+
+        /// <summary>
+        /// Gets the Common Table Expressions for this SelectQuery
+        /// </summary>
+        public CommonTableExpressionCollection CommonTableExpressions
+        {
+            get { return commonTableExpressions; }
         }
 
         /// <summary>
@@ -309,6 +318,7 @@ namespace Reeb.SqlOM;
             newQuery.columns = new SelectColumnCollection(columns);
             newQuery.orderByTerms = new OrderByTermCollection(orderByTerms);
             newQuery.groupByTerms = new GroupByTermCollection(groupByTerms);
+            newQuery.commonTableExpressions = commonTableExpressions.Clone();
 
             newQuery.wherePhrase = wherePhrase.Clone();
             newQuery.fromClause = fromClause.Clone();

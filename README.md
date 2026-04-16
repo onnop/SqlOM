@@ -41,6 +41,7 @@ Currently the following databases are supported. We continuously add support for
 * MySQL
 * MariaDB
 * SQLite
+* PostgreSQL
 
 ## Features
 
@@ -50,10 +51,12 @@ Currently the following databases are supported. We continuously add support for
 - ✅ Multiple JOIN types (INNER, LEFT, RIGHT, FULL, CROSS)
 - ✅ CASE expressions
 - ✅ UNION queries
+- ✅ Common Table Expressions (CTEs)
 - ✅ Paging support
 - ✅ Parameterized queries
 - ✅ Cross-Tabs (Pivot Tables)
 - ✅ Attribute-based strongly-typed query building
+- ✅ Fluent API for query building
 - ✅ Modern C# 12 syntax support
 - ✅ Multi-targets .NET 8.0 and .NET 9.0
 
@@ -158,6 +161,9 @@ SelectQuery query = new SelectQuery();
 
 // For SQL Server
 string sql = new SqlServerRenderer().RenderSelect(query);
+
+// For PostgreSQL
+string sql = new PostgreSqlRenderer().RenderSelect(query);
 
 // For MySQL
 string sql = new MySqlRenderer().RenderSelect(query);
@@ -457,7 +463,52 @@ var tCustom = Table<Phase>("custom");  // explicit alias
 | `columns.AddAllColumns<T>(table)` | Adds all columns, auto-skips navigation/[NotMapped] |
 | `SqlConstantCollection.FromGuids(list)` | Creates constants from Guid list |
 
-### 13. CASE Expressions (Advanced)
+### 13. Fluent API Query Building
+
+Use the fluent API for more readable and chainable query construction:
+
+```csharp
+using Reeb.SqlOM;
+using static Reeb.SqlOM.SqlOMExtensions;
+
+FromTerm customers = Table<CustomerRow>();
+FromTerm orders = Table<OrderRow>();
+
+SelectQuery query = new SelectQuery()
+    .Select<CustomerRow>(x => x.Name, customers)
+    .Select<OrderRow>(x => x.Total, orders)
+    .Join(JoinType.Inner, customers, orders, 
+          ColumnName<CustomerRow>(x => x.Id), 
+          ColumnName<OrderRow>(x => x.CustomerId))
+    .Where<CustomerRow>(x => x.Name, customers, CompareOperator.Equal, SqlExpression.String("John"))
+    .OrderBy("name", customers, OrderByDirection.Ascending)
+    .Top(10);
+
+SqlServerRenderer renderer = new SqlServerRenderer();
+string sql = renderer.RenderSelect(query);
+// Result: SELECT [c].[Name], [o].[Total] FROM [customers] [c] 
+//         INNER JOIN [orders] [o] ON [c].[Id] = [o].[customer_id] 
+//         WHERE [c].[Name] = 'John' ORDER BY [c].[name] LIMIT 10
+```
+
+#### Available Fluent Methods
+
+| Method | Description |
+|--------|-------------|
+| `.Where(term)` | Adds a WHERE condition |
+| `.Where<T>(fieldExpr, table, op, value)` | Adds a type-safe WHERE condition |
+| `.OrderBy(field, table?, direction?)` | Adds ORDER BY clause |
+| `.OrderBy<T>(fieldExpr, table, direction?)` | Adds type-safe ORDER BY |
+| `.GroupBy(field, table?)` | Adds GROUP BY clause |
+| `.GroupBy<T>(fieldExpr, table)` | Adds type-safe GROUP BY |
+| `.Select(column)` | Adds a column to SELECT |
+| `.Select<T>(fieldExpr, table, alias?)` | Adds type-safe column |
+| `.Join(type, leftTable, rightTable, leftField, rightField)` | Adds JOIN |
+| `.WithCte(name, query, columnNames?)` | Adds Common Table Expression |
+| `.Top(count)` | Sets TOP/LIMIT |
+| `.Distinct()` | Sets DISTINCT |
+
+### 14. CASE Expressions (Advanced)
 
 Using CASE statements in SELECT columns:
 
@@ -486,7 +537,7 @@ SqlServerRenderer renderer = new SqlServerRenderer();
 string sql = renderer.RenderSelect(query);
 ```
 
-### 14. UNION Queries
+### 15. UNION Queries
 
 Combining multiple SELECT queries:
 
@@ -510,7 +561,123 @@ string sql = renderer.RenderUnion(union);
 // Result: SELECT price * 10 [priceX10] FROM [products] UNION ALL SELECT [price] [priceX10] FROM [products]
 ```
 
-### 15. Parameterized Queries
+### 16. Common Table Expressions (CTEs)
+
+Using WITH clauses for complex queries and recursive operations:
+
+#### Simple CTE
+
+```csharp
+// Create a CTE that calculates total sales per customer
+SelectQuery cteQuery = new SelectQuery();
+cteQuery.Columns.Add(new SelectColumn("customer_id"));
+cteQuery.Columns.Add(new SelectColumn(SqlExpression.Raw("SUM(amount)"), "total_sales"));
+cteQuery.FromClause.BaseTable = FromTerm.Table("orders");
+cteQuery.GroupByTerms.Add(new GroupByTerm("customer_id"));
+
+CommonTableExpression cte = new CommonTableExpression("customer_totals", cteQuery);
+
+// Main query using the CTE
+SelectQuery mainQuery = new SelectQuery();
+mainQuery.CommonTableExpressions.Add(cte);
+mainQuery.Columns.Add(new SelectColumn("customer_id"));
+mainQuery.Columns.Add(new SelectColumn("total_sales"));
+mainQuery.FromClause.BaseTable = FromTerm.Table("customer_totals", "ct");
+mainQuery.WherePhrase.Terms.Add(WhereTerm.CreateCompare(
+    SqlExpression.Field("total_sales", "ct"), 
+    SqlExpression.Number(1000), 
+    CompareOperator.Greater));
+
+SqlServerRenderer renderer = new SqlServerRenderer();
+string sql = renderer.RenderSelect(mainQuery);
+// Result: WITH [customer_totals] AS (SELECT [customer_id], SUM(amount) [total_sales] FROM [orders] GROUP BY [customer_id]) SELECT [customer_id], [total_sales] FROM [customer_totals] ct WHERE [ct].[total_sales] > 1000
+```
+
+#### Multiple CTEs
+
+```csharp
+// First CTE - high value customers
+SelectQuery highValueQuery = new SelectQuery();
+highValueQuery.Columns.Add(new SelectColumn("customer_id"));
+highValueQuery.Columns.Add(new SelectColumn("name"));
+highValueQuery.FromClause.BaseTable = FromTerm.Table("customers");
+highValueQuery.WherePhrase.Terms.Add(WhereTerm.CreateCompare(
+    SqlExpression.Field("total_purchases"), 
+    SqlExpression.Number(5000), 
+    CompareOperator.Greater));
+
+CommonTableExpression highValueCte = new CommonTableExpression("high_value_customers", highValueQuery);
+
+// Second CTE - recent orders
+SelectQuery recentOrdersQuery = new SelectQuery();
+recentOrdersQuery.Columns.Add(new SelectColumn("customer_id"));
+recentOrdersQuery.Columns.Add(new SelectColumn("order_date"));
+recentOrdersQuery.Columns.Add(new SelectColumn("amount"));
+recentOrdersQuery.FromClause.BaseTable = FromTerm.Table("orders");
+recentOrdersQuery.WherePhrase.Terms.Add(WhereTerm.CreateCompare(
+    SqlExpression.Field("order_date"), 
+    SqlExpression.Raw("DATEADD(month, -3, GETDATE())"), 
+    CompareOperator.Greater));
+
+CommonTableExpression recentOrdersCte = new CommonTableExpression("recent_orders", recentOrdersQuery);
+
+// Main query joining both CTEs
+SelectQuery mainQuery = new SelectQuery();
+mainQuery.CommonTableExpressions.Add(highValueCte);
+mainQuery.CommonTableExpressions.Add(recentOrdersCte);
+mainQuery.Columns.Add(new SelectColumn("h.name"));
+mainQuery.Columns.Add(new SelectColumn(SqlExpression.Raw("SUM(r.amount)"), "recent_total"));
+mainQuery.FromClause.BaseTable = FromTerm.Table("high_value_customers", "h");
+mainQuery.Joins.Add(JoinType.Inner, FromTerm.Table("recent_orders", "r"), 
+    WhereTerm.CreateCompare(SqlExpression.Field("customer_id", "h"), SqlExpression.Field("customer_id", "r")));
+mainQuery.GroupByTerms.Add(new GroupByTerm("h.customer_id"));
+mainQuery.GroupByTerms.Add(new GroupByTerm("h.name"));
+
+SqlServerRenderer renderer = new SqlServerRenderer();
+string sql = renderer.RenderSelect(mainQuery);
+// Result: WITH [high_value_customers] AS (SELECT [customer_id], [name] FROM [customers] WHERE [total_purchases] > 5000), [recent_orders] AS (SELECT [customer_id], [order_date], [amount] FROM [orders] WHERE [order_date] > DATEADD(month, -3, GETDATE())) SELECT [h].[name], SUM(r.amount) [recent_total] FROM [high_value_customers] h INNER JOIN [recent_orders] r ON [h].[customer_id] = [r].[customer_id] GROUP BY [h].[customer_id], [h].[name]
+```
+
+#### Recursive CTE (Hierarchical Data)
+
+```csharp
+// CTE for employee hierarchy
+SelectQuery baseQuery = new SelectQuery();
+baseQuery.Columns.Add(new SelectColumn("employee_id"));
+baseQuery.Columns.Add(new SelectColumn("manager_id"));
+baseQuery.Columns.Add(new SelectColumn("name"));
+baseQuery.Columns.Add(new SelectColumn(SqlExpression.Number(0), "level"));
+baseQuery.FromClause.BaseTable = FromTerm.Table("employees");
+baseQuery.WherePhrase.Terms.Add(WhereTerm.CreateIsNull(SqlExpression.Field("manager_id")));
+
+SelectQuery recursiveQuery = new SelectQuery();
+recursiveQuery.Columns.Add(new SelectColumn("e.employee_id"));
+recursiveQuery.Columns.Add(new SelectColumn("e.manager_id"));
+recursiveQuery.Columns.Add(new SelectColumn("e.name"));
+recursiveQuery.Columns.Add(new SelectColumn(SqlExpression.Raw("h.level + 1"), "level"));
+recursiveQuery.FromClause.BaseTable = FromTerm.Table("employees", "e");
+recursiveQuery.Joins.Add(JoinType.Inner, FromTerm.Table("hierarchy", "h"), 
+    WhereTerm.CreateCompare(SqlExpression.Field("e.manager_id", "e"), SqlExpression.Field("employee_id", "h")));
+
+CommonTableExpression hierarchyCte = new CommonTableExpression("hierarchy", baseQuery);
+hierarchyCte.RecursiveQuery = recursiveQuery;
+
+// Main query
+SelectQuery mainQuery = new SelectQuery();
+mainQuery.CommonTableExpressions.Add(hierarchyCte);
+mainQuery.Columns.Add(new SelectColumn("employee_id"));
+mainQuery.Columns.Add(new SelectColumn("name"));
+mainQuery.Columns.Add(new SelectColumn("level"));
+mainQuery.FromClause.BaseTable = FromTerm.Table("hierarchy");
+mainQuery.OrderByTerms.Add(new OrderByTerm("level"));
+mainQuery.OrderByTerms.Add(new OrderByTerm("name"));
+
+SqlServerRenderer renderer = new SqlServerRenderer();
+string sql = renderer.RenderSelect(mainQuery);
+// Result: WITH [hierarchy] AS (SELECT [employee_id], [manager_id], [name], 0 [level] FROM [employees] WHERE [manager_id] IS NULL UNION ALL SELECT [e].[employee_id], [e].[manager_id], [e].[name], h.level + 1 [level] FROM [employees] e INNER JOIN [hierarchy] h ON [e].[manager_id] = [h].[employee_id]) SELECT [employee_id], [name], [level] FROM [hierarchy] ORDER BY [level], [name]
+```
+
+### 17. Parameterized Queries
 
 Using parameters for better performance and security:
 
@@ -543,7 +710,7 @@ command.Parameters.Add("@customerName", SqlDbType.NVarChar).Value = "John";
 command.Parameters.Add("@minAge", SqlDbType.Int).Value = 18;
 ```
 
-### 16. Paging
+### 18. Paging
 
 Implementing pagination for large result sets:
 
@@ -568,7 +735,7 @@ int pageSize = 10;
 string sql = renderer.RenderPage(pageIndex, pageSize, totalRows, query);
 ```
 
-### 17. Subqueries
+### 19. Subqueries
 
 Using subqueries in WHERE clauses:
 
@@ -597,7 +764,7 @@ SqlServerRenderer renderer = new SqlServerRenderer();
 string sql = renderer.RenderSelect(query);
 ```
 
-### 18. EXISTS and NOT EXISTS
+### 20. EXISTS and NOT EXISTS
 
 Using EXISTS clauses:
 
@@ -627,7 +794,7 @@ string sql = renderer.RenderSelect(query);
 //         WHERE EXISTS (SELECT * FROM [orders] [o] WHERE [o].[customerId] = [c].[customerId])
 ```
 
-### 19. Cross-Tabs (Pivot Tables) - Advanced
+### 21. Cross-Tabs (Pivot Tables) - Advanced
 
 Creating dynamic pivot tables for reporting:
 
@@ -661,7 +828,7 @@ SqlServerRenderer renderer = new SqlServerRenderer();
 string sql = renderer.RenderSelect(pivotQuery);
 ```
 
-### 20. Cross-Tab Drill-Down - Advanced
+### 22. Cross-Tab Drill-Down - Advanced
 
 Drilling down into pivot table cells:
 

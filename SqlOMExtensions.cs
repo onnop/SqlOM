@@ -133,5 +133,15 @@ public static class SqlOMExtensions
         return attr?.Name ?? propertyInfo.Name;
     }
 
+    /// <summary>
+    /// Generates a complete SELECT query from a row type in one line.
+    /// Creates a query with all non-ignored columns selected.
+    /// Convenience method for use with 'using static Reeb.SqlOM.SqlOMExtensions;'
+    /// </summary>
+    public static SelectQuery GenerateSelectQuery<T>(string? alias = null)
+    {
+        return SelectQuery.For<T>(alias);
+    }
+
     #endregion
 }

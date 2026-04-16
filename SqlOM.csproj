@@ -8,7 +8,7 @@
     
     <!-- Package Metadata -->
     <Title>SqlOM - Dynamic SQL Query Generator</Title>
-    <Description>SqlOM is a software component which allows you to programmatically create SQL queries at runtime using a convenient .NET Object Model, thus creating an abstraction layer over SQL. Supports SQL Server, Oracle, MySQL, MariaDB, and SQLite.</Description>
+    <Description>SqlOM is a software component which allows you to programmatically create SQL queries at runtime using a convenient .NET Object Model, thus creating an abstraction layer over SQL. Supports SQL Server, Oracle, MySQL, MariaDB, SQLite, and PostgreSQL with modern C# features including fluent API and Common Table Expressions.</Description>
     <Authors>SqlOM Contributors</Authors>
     <Company>SqlOM</Company>
     <Copyright>Copyright © onnop</Copyright>
@@ -18,18 +18,21 @@
     <PackageLicenseFile>License.txt</PackageLicenseFile>
     <PackageIcon>Logo_initials.png</PackageIcon>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageTags>SQL;SQL-Generator;Query-Builder;Dynamic-SQL;Database;ORM;SQL-Server;Oracle;MySQL;MariaDB;SQLite</PackageTags>
+    <PackageTags>SQL;SQL-Generator;Query-Builder;Dynamic-SQL;Database;ORM;SQL-Server;Oracle;MySQL;MariaDB;SQLite;PostgreSQL;CTE;Fluent-API;LINQ;Modern-CSharp</PackageTags>
     <PackageReleaseNotes>
-      Version 1.0.9 - Public extension methods for static imports
-      • SqlOMExtensions class is now public to support 'using static Reeb.SqlOM.SqlOMExtensions'
-      • Added convenience methods for static import usage:
-        - Table&lt;T&gt;() - creates a FromTerm for a typed table
-        - Table&lt;T&gt;(string alias) - creates a FromTerm with custom alias
-        - Field&lt;T&gt;(expression, table) - creates a SqlExpression for a field
-        - ColumnName&lt;T&gt;(expression) - gets the column name from attribute or property name
-      • Enables cleaner query building syntax in consuming projects
+      Version 1.1.0 - Major Feature Enhancements
+      • Added PostgreSQL support with full renderer implementation
+      • Implemented Common Table Expressions (CTEs) with recursive support
+      • Added comprehensive Fluent API for chainable query building
+      • Enhanced nullability support with nullable reference types
+      • Added GenerateSelectQuery&lt;T&gt;() method for strongly-typed query generation
+      • Improved type safety with LINQ expression integration
+      • Fixed critical nullability issues in core classes
+      • Added support for modern C# 12 syntax
+      • Enhanced documentation with comprehensive examples
+      • Maintained backward compatibility with existing APIs
     </PackageReleaseNotes>
-    <Version>1.0.9</Version>
+    <Version>1.1.0</Version>
     <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
   </PropertyGroup>
 
@@ -37,6 +40,11 @@
     <None Include="License.txt" Pack="true" PackagePath="\" />
     <None Include="Logo_initials.png" Pack="true" PackagePath="\" />
     <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="SqlOM.Tests\**\*.cs" />
+    <Compile Remove="SqlOM.ConsoleTest\**\*.cs" />
   </ItemGroup>
 
 </Project>

@@ -129,6 +129,41 @@ public abstract class SqlOmRenderer : ISqlOmRenderer //, IClauseRendererContext
 
 
         /// <summary>
+        /// Renders Common Table Expressions
+        /// </summary>
+        /// <param name="builder">String builder</param>
+        /// <param name="ctes">CTE collection</param>
+        protected virtual void RenderCommonTableExpressions(StringBuilder builder, CommonTableExpressionCollection ctes)
+        {
+            if (ctes.Count == 0) return;
+
+            builder.Append("WITH ");
+            for (int i = 0; i < ctes.Count; i++)
+            {
+                if (i > 0)
+                    builder.Append(", ");
+
+                var cte = ctes[i];
+                Identifier(builder, cte.Name, true);
+                if (cte.ColumnNames != null && cte.ColumnNames.Length > 0)
+                {
+                    builder.Append(" (");
+                    for (int j = 0; j < cte.ColumnNames.Length; j++)
+                    {
+                        if (j > 0)
+                            builder.Append(", ");
+                        Identifier(builder, cte.ColumnNames[j], true);
+                    }
+                    builder.Append(")");
+                }
+                builder.Append(" AS (");
+                builder.Append(RenderSelect(cte.Query));
+                builder.Append(")");
+            }
+            builder.Append(" ");
+        }
+
+        /// <summary>
         /// Renders a UNION clause
         /// </summary>
         /// <param name="union">Union definition</param>
@@ -313,7 +348,8 @@ public abstract class SqlOmRenderer : ISqlOmRenderer //, IClauseRendererContext
                     TableNamespace(builder, table.Ns2);
                 if (table.Ns1 == null && table.Ns2 == null && tableSpace != null)
                     TableNamespace(builder, tableSpace);
-                Identifier(builder, (string)table.Expression, table.RenderIdentifierQuotes);
+                string nameToRender = table.Expression != null ? (string)table.Expression : table.Alias!;
+                Identifier(builder, nameToRender, table.RenderIdentifierQuotes);
             }
             else if (table.Type == FromTermType.SubQuery)
                 builder.AppendFormat("( {0} )", table.Expression);
