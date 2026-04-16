@@ -5,6 +5,8 @@ VisualStudioVersion = 17.7.34024.191
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SqlOM", "SqlOM.csproj", "{04B71A85-1FFB-424F-A85A-6483CFCFB64E}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SqlOM.Tests", "SqlOM.Tests\SqlOM.Tests.csproj", "{3C06B736-CFE0-ACF4-B5B3-F86F83D7F249}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -27,6 +29,18 @@ Global
 		{04B71A85-1FFB-424F-A85A-6483CFCFB64E}.Release|x64.Build.0 = Release|Any CPU
 		{04B71A85-1FFB-424F-A85A-6483CFCFB64E}.Release|x86.ActiveCfg = Release|Any CPU
 		{04B71A85-1FFB-424F-A85A-6483CFCFB64E}.Release|x86.Build.0 = Release|Any CPU
+		{3C06B736-CFE0-ACF4-B5B3-F86F83D7F249}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3C06B736-CFE0-ACF4-B5B3-F86F83D7F249}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3C06B736-CFE0-ACF4-B5B3-F86F83D7F249}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{3C06B736-CFE0-ACF4-B5B3-F86F83D7F249}.Debug|x64.Build.0 = Debug|Any CPU
+		{3C06B736-CFE0-ACF4-B5B3-F86F83D7F249}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{3C06B736-CFE0-ACF4-B5B3-F86F83D7F249}.Debug|x86.Build.0 = Debug|Any CPU
+		{3C06B736-CFE0-ACF4-B5B3-F86F83D7F249}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3C06B736-CFE0-ACF4-B5B3-F86F83D7F249}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3C06B736-CFE0-ACF4-B5B3-F86F83D7F249}.Release|x64.ActiveCfg = Release|Any CPU
+		{3C06B736-CFE0-ACF4-B5B3-F86F83D7F249}.Release|x64.Build.0 = Release|Any CPU
+		{3C06B736-CFE0-ACF4-B5B3-F86F83D7F249}.Release|x86.ActiveCfg = Release|Any CPU
+		{3C06B736-CFE0-ACF4-B5B3-F86F83D7F249}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
