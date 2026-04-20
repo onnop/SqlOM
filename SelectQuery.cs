@@ -87,7 +87,7 @@ namespace Reeb.SqlOM;
     {
         SelectColumnCollection columns = new();
         WhereClause wherePhrase = new();
-        readonly WhereClause havingPhrase = new();
+        WhereClause havingPhrase = new();
         FromClause fromClause = new();
 
         OrderByTermCollection orderByTerms = new();
@@ -321,6 +321,7 @@ namespace Reeb.SqlOM;
             newQuery.commonTableExpressions = commonTableExpressions.Clone();
 
             newQuery.wherePhrase = wherePhrase.Clone();
+            newQuery.havingPhrase = havingPhrase.Clone();
             newQuery.fromClause = fromClause.Clone();
 
             return newQuery;
@@ -345,7 +346,7 @@ namespace Reeb.SqlOM;
         /// execution plan cache. For the cache to work in SQL Server 2000, all database objects in a query must be fully qualified.
         /// Setting <see cref="TableSpace"/> property might releive of the duty to fully qualify all table names in the query.
         /// </remarks>
-        public string TableSpace
+        public string? TableSpace
         {
             get { return tableSpace; }
             set { tableSpace = value; }

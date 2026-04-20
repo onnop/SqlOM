@@ -1,7 +1,7 @@
 # SqlOM
 
 [![NuGet](https://img.shields.io/nuget/v/SqlOM.svg)](https://www.nuget.org/packages/SqlOM)
-[![.NET](https://img.shields.io/badge/.NET-8.0%20%7C%209.0-blue.svg)](https://dotnet.microsoft.com/download)
+[![.NET](https://img.shields.io/badge/.NET-netstandard2.1%20%7C%208.0%20%7C%209.0-blue.svg)](https://dotnet.microsoft.com/download)
 
 **Generate dynamic SQL queries using C# code only**
 
@@ -29,7 +29,7 @@ dotnet add package SqlOM
 
 ### PackageReference
 ```xml
-<PackageReference Include="SqlOM" Version="1.0.8" />
+<PackageReference Include="SqlOM" Version="1.1.0" />
 ```
 
 ## Supported Databases
@@ -51,14 +51,15 @@ Currently the following databases are supported. We continuously add support for
 - ✅ Multiple JOIN types (INNER, LEFT, RIGHT, FULL, CROSS)
 - ✅ CASE expressions
 - ✅ UNION queries
-- ✅ Common Table Expressions (CTEs)
-- ✅ Paging support
+- ✅ Common Table Expressions (CTEs), including recursive CTEs (`WITH RECURSIVE`)
+- ✅ Paging support (legacy `ROW_NUMBER()` wrapper and modern `OFFSET/FETCH` for SQL Server 2012+, `LIMIT/OFFSET` for PostgreSQL/MySQL/SQLite)
 - ✅ Parameterized queries
 - ✅ Cross-Tabs (Pivot Tables)
 - ✅ Attribute-based strongly-typed query building
 - ✅ Fluent API for query building
 - ✅ Modern C# 12 syntax support
-- ✅ Multi-targets .NET 8.0 and .NET 9.0
+- ✅ Multi-targets .NET Standard 2.1, .NET 8.0, and .NET 9.0
+- ✅ Source Link, deterministic builds, and symbol packages for step-through debugging
 
 ## Examples (Simple to Complex)
 
@@ -640,27 +641,42 @@ string sql = renderer.RenderSelect(mainQuery);
 
 #### Recursive CTE (Hierarchical Data)
 
+A recursive CTE is modeled as a single `SelectQuery` that UNIONs the anchor and recursive members, wrapped in a `CommonTableExpression` with `IsRecursive = true`. Any recursive CTE in the list causes the renderer to emit `WITH RECURSIVE` (standard syntax accepted by PostgreSQL, SQLite, MySQL 8+, MariaDB 10.2+, and Oracle 12c+; SQL Server also accepts it).
+
 ```csharp
-// CTE for employee hierarchy
-SelectQuery baseQuery = new SelectQuery();
-baseQuery.Columns.Add(new SelectColumn("employee_id"));
-baseQuery.Columns.Add(new SelectColumn("manager_id"));
-baseQuery.Columns.Add(new SelectColumn("name"));
-baseQuery.Columns.Add(new SelectColumn(SqlExpression.Number(0), "level"));
-baseQuery.FromClause.BaseTable = FromTerm.Table("employees");
-baseQuery.WherePhrase.Terms.Add(WhereTerm.CreateIsNull(SqlExpression.Field("manager_id")));
+// Anchor member: top-level employees (managers with no manager)
+SelectQuery anchor = new SelectQuery();
+anchor.Columns.Add(new SelectColumn("employee_id"));
+anchor.Columns.Add(new SelectColumn("manager_id"));
+anchor.Columns.Add(new SelectColumn("name"));
+anchor.Columns.Add(new SelectColumn(SqlExpression.Number(0), "level"));
+anchor.FromClause.BaseTable = FromTerm.Table("employees");
+anchor.WherePhrase.Terms.Add(WhereTerm.CreateIsNull(SqlExpression.Field("manager_id")));
 
-SelectQuery recursiveQuery = new SelectQuery();
-recursiveQuery.Columns.Add(new SelectColumn("e.employee_id"));
-recursiveQuery.Columns.Add(new SelectColumn("e.manager_id"));
-recursiveQuery.Columns.Add(new SelectColumn("e.name"));
-recursiveQuery.Columns.Add(new SelectColumn(SqlExpression.Raw("h.level + 1"), "level"));
-recursiveQuery.FromClause.BaseTable = FromTerm.Table("employees", "e");
-recursiveQuery.Joins.Add(JoinType.Inner, FromTerm.Table("hierarchy", "h"), 
-    WhereTerm.CreateCompare(SqlExpression.Field("e.manager_id", "e"), SqlExpression.Field("employee_id", "h")));
+// Recursive member: employees joined to their manager already in the hierarchy
+FromTerm tEmp = FromTerm.Table("employees", "e");
+FromTerm tHierarchy = FromTerm.Table("hierarchy", "h");
+SelectQuery recursive = new SelectQuery();
+recursive.Columns.Add(new SelectColumn("employee_id", tEmp));
+recursive.Columns.Add(new SelectColumn("manager_id", tEmp));
+recursive.Columns.Add(new SelectColumn("name", tEmp));
+recursive.Columns.Add(new SelectColumn(SqlExpression.Raw("h.level + 1"), "level"));
+recursive.FromClause.BaseTable = tEmp;
+recursive.FromClause.Join(JoinType.Inner, tEmp, tHierarchy, "manager_id", "employee_id");
 
-CommonTableExpression hierarchyCte = new CommonTableExpression("hierarchy", baseQuery);
-hierarchyCte.RecursiveQuery = recursiveQuery;
+// UNION ALL the anchor and recursive members into the CTE body
+SqlUnion union = new SqlUnion();
+union.Add(anchor);
+union.Add(recursive, DistinctModifier.All);
+
+// A UNION isn't a SelectQuery, so wrap it via a subquery FromTerm
+SelectQuery cteBody = new SelectQuery(FromTerm.SubQueryObj(union, "u"));
+cteBody.Columns.Add(new SelectColumn("*"));
+
+CommonTableExpression hierarchyCte = new CommonTableExpression("hierarchy", cteBody)
+{
+    IsRecursive = true  // emits WITH RECURSIVE
+};
 
 // Main query
 SelectQuery mainQuery = new SelectQuery();
@@ -672,9 +688,18 @@ mainQuery.FromClause.BaseTable = FromTerm.Table("hierarchy");
 mainQuery.OrderByTerms.Add(new OrderByTerm("level"));
 mainQuery.OrderByTerms.Add(new OrderByTerm("name"));
 
-SqlServerRenderer renderer = new SqlServerRenderer();
+PostgreSqlRenderer renderer = new PostgreSqlRenderer();
 string sql = renderer.RenderSelect(mainQuery);
-// Result: WITH [hierarchy] AS (SELECT [employee_id], [manager_id], [name], 0 [level] FROM [employees] WHERE [manager_id] IS NULL UNION ALL SELECT [e].[employee_id], [e].[manager_id], [e].[name], h.level + 1 [level] FROM [employees] e INNER JOIN [hierarchy] h ON [e].[manager_id] = [h].[employee_id]) SELECT [employee_id], [name], [level] FROM [hierarchy] ORDER BY [level], [name]
+// Result (PostgreSQL):
+// WITH RECURSIVE "hierarchy" AS (
+//   SELECT * FROM (
+//     SELECT "employee_id", "manager_id", "name", 0 "level" FROM "employees" WHERE "manager_id" IS NULL
+//     UNION ALL
+//     SELECT "e"."employee_id", "e"."manager_id", "e"."name", h.level + 1 "level"
+//     FROM "employees" "e" INNER JOIN "hierarchy" "h" ON "e"."manager_id" = "h"."employee_id"
+//   ) "u"
+// )
+// SELECT "employee_id", "name", "level" FROM "hierarchy" ORDER BY "level" asc, "name" asc
 ```
 
 ### 17. Parameterized Queries
@@ -734,6 +759,24 @@ int pageIndex = 0; // Zero-based
 int pageSize = 10;
 string sql = renderer.RenderPage(pageIndex, pageSize, totalRows, query);
 ```
+
+#### SQL Server OFFSET / FETCH paging (SQL Server 2012+)
+
+By default, `SqlServerRenderer` emits a nested `ROW_NUMBER()` wrapper so the generated SQL works on SQL Server 2005+. If you're targeting SQL Server 2012 or later, enable the more efficient `OFFSET ... FETCH NEXT` form:
+
+```csharp
+SelectQuery query = new SelectQuery();
+query.Columns.Add(new SelectColumn("name"));
+query.FromClause.BaseTable = FromTerm.Table("customers");
+query.OrderByTerms.Add(new OrderByTerm("name", OrderByDirection.Ascending));
+query.SetPaging(pageIndex: 2, pageSize: 10);
+
+SqlServerRenderer renderer = new SqlServerRenderer { UseOffsetFetchPaging = true };
+string sql = renderer.RenderSelect(query);
+// Result: select [name] from [customers] order by [name] asc offset 20 rows fetch next 10 rows only
+```
+
+PostgreSQL, MySQL, and SQLite renderers natively use `LIMIT` / `OFFSET` and need no flag.
 
 ### 19. Subqueries
 
@@ -845,7 +888,7 @@ string sql = renderer.RenderSelect(drillDownQuery);
 
 ## Requirements
 
-- .NET 8.0 or later (.NET 8.0 and .NET 9.0 are supported)
+- .NET Standard 2.1, .NET 8.0, or .NET 9.0
 
 ## License
 
@@ -856,6 +899,32 @@ See [License.txt](License.txt) for license information.
 Contributions are welcome! If you find a bug or have a feature request, please open an issue on the project repository.
 
 ## Version History
+
+### 1.1.0
+
+**New features**
+- Recursive CTE support (`WITH RECURSIVE`) via `CommonTableExpression.IsRecursive`
+- SQL Server OFFSET/FETCH paging mode: `new SqlServerRenderer { UseOffsetFetchPaging = true }`
+- Added `netstandard2.1` target alongside `net8.0` and `net9.0`
+- Source Link, deterministic builds, and symbol packages (`.snupkg`) for better debugging
+
+**Bug fixes**
+- PostgreSQL renderer no longer emits T-SQL `top N` or `with cube` / `with rollup`; it now uses `LIMIT` for `Top` and throws a clear `InvalidQueryException` for the cube/rollup modifiers
+- `SelectQuery.Clone()` now clones the `HAVING` phrase (was silently dropped)
+- `ReadUncommitted` no longer leaks `with (nolock)` to Oracle, PostgreSQL, MySQL, or SQLite renderers
+- `Constant()` rendering: added the missing `else` branch for `Number`, switched to `InvariantCulture`, and applies `SqlEncode` to string/guid literals for defense-in-depth
+- Identifier casing is now culture-invariant (`ToUpperInvariant`) — fixes the Turkish-locale bug
+- `IS NULL` / `IS NOT NULL` / `WHERE` rendering no longer produces double spaces
+
+**Performance / cleanup**
+- `ByteArrayToHexString` uses `Convert.ToHexString` on .NET 5+
+- Replaced `AppendFormat`-with-no-args calls with direct `Append`
+- Replaced the `if (item != collection[0])` anti-pattern in rendering loops with index-based iteration
+- Removed large blocks of commented-out dead code
+
+### 1.0.9
+- `SqlOMExtensions` promoted to public for `using static` convenience
+- New `Table<T>()`, `Field<T>()`, `ColumnName<T>()`, `GenerateSelectQuery<T>()` convenience methods
 
 ### 1.0.8
 - `SelectColumnCollection.Add<T>()` and `AddAllColumns<T>()` are now instance methods

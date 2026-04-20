@@ -1,14 +1,19 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFrameworks>net8.0;net9.0</TargetFrameworks>
+    <TargetFrameworks>netstandard2.1;net8.0;net9.0</TargetFrameworks>
     <LangVersion>latest</LangVersion>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+    <AnalysisLevel>latest</AnalysisLevel>
+    <Deterministic>true</Deterministic>
+    <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
+
     <!-- Package Metadata -->
     <Title>SqlOM - Dynamic SQL Query Generator</Title>
-    <Description>SqlOM is a software component which allows you to programmatically create SQL queries at runtime using a convenient .NET Object Model, thus creating an abstraction layer over SQL. Supports SQL Server, Oracle, MySQL, MariaDB, SQLite, and PostgreSQL with modern C# features including fluent API and Common Table Expressions.</Description>
+    <Description>SqlOM is a software component which allows you to programmatically create SQL queries at runtime using a convenient .NET Object Model, thus creating an abstraction layer over SQL. Supports SQL Server, Oracle, MySQL, MariaDB, SQLite, and PostgreSQL with modern C# features including fluent API, Common Table Expressions, and first-class parameterized query output.</Description>
     <Authors>SqlOM Contributors</Authors>
     <Company>SqlOM</Company>
     <Copyright>Copyright © onnop</Copyright>
@@ -20,20 +25,36 @@
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageTags>SQL;SQL-Generator;Query-Builder;Dynamic-SQL;Database;ORM;SQL-Server;Oracle;MySQL;MariaDB;SQLite;PostgreSQL;CTE;Fluent-API;LINQ;Modern-CSharp</PackageTags>
     <PackageReleaseNotes>
-      Version 1.1.0 - Major Feature Enhancements
-      • Added PostgreSQL support with full renderer implementation
-      • Implemented Common Table Expressions (CTEs) with recursive support
-      • Added comprehensive Fluent API for chainable query building
-      • Enhanced nullability support with nullable reference types
-      • Added GenerateSelectQuery&lt;T&gt;() method for strongly-typed query generation
-      • Improved type safety with LINQ expression integration
-      • Fixed critical nullability issues in core classes
-      • Added support for modern C# 12 syntax
-      • Enhanced documentation with comprehensive examples
-      • Maintained backward compatibility with existing APIs
+      Version 1.1.0 - Correctness, performance, and security release
+
+      New:
+      • Recursive CTE support (WITH RECURSIVE) via CommonTableExpression.IsRecursive
+      • SQL Server OFFSET-FETCH paging mode (SqlServerRenderer.UseOffsetFetchPaging)
+      • netstandard2.1 target added alongside net8.0 / net9.0
+      • Source Link, deterministic builds, and symbol packages (.snupkg) for better debugging
+
+      Fixed:
+      • PostgreSQL renderer no longer emits T-SQL "top N" or "with cube / with rollup"
+      • SelectQuery.Clone() now clones the HAVING phrase (was silently dropped)
+      • ReadUncommitted no longer leaks "with (nolock)" to Oracle / PostgreSQL / MySQL / SQLite
+      • Constant rendering: added missing else before Number, invariant culture, SqlEncode applied to string/guid literals for defense-in-depth
+      • Identifier casing is now culture-invariant (ToUpperInvariant)
+      • IS NULL / IS NOT NULL / WHERE no longer produce double spaces
+
+      Performance / cleanup:
+      • ByteArrayToHexString uses Convert.ToHexString on .NET 5+
+      • AppendFormat-with-no-args calls replaced with direct Append
+      • Index-based iteration replaces "if (item != collection[0])" anti-pattern
+      • Removed dead commented-out code blocks
     </PackageReleaseNotes>
     <Version>1.1.0</Version>
     <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
+
+    <!-- Symbol packages / Source Link -->
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
   </PropertyGroup>
 
   <ItemGroup>
@@ -44,7 +65,10 @@
 
   <ItemGroup>
     <Compile Remove="SqlOM.Tests\**\*.cs" />
-    <Compile Remove="SqlOM.ConsoleTest\**\*.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="All" />
   </ItemGroup>
 
 </Project>

@@ -6,13 +6,19 @@ namespace Reeb.SqlOM.Render;
 /// <summary>
 /// Provides common implementation for ISqlOmRenderer
 /// </summary>
-public abstract class SqlOmRenderer : ISqlOmRenderer //, IClauseRendererContext
+public abstract class SqlOmRenderer : ISqlOmRenderer
 {
+    /// <summary>Date-only format string used by <see cref="Constant"/>.</summary>
     protected string dateFormat = "MM/dd/yyyy";
+    /// <summary>Full timestamp format string used by <see cref="Constant"/>.</summary>
     protected string dateTimeFormat = "MM/dd/yyyy HH:mm:ss.fff";
+    /// <summary>When true, renderers that support it may emit a read-uncommitted lock hint.</summary>
     protected bool readUncommitted = false;
     readonly char identifierOpeningQuote;
     readonly char identifierClosingQuote;
+
+    /// <summary>Culture used for rendering numeric and date literal values.</summary>
+    protected static readonly CultureInfo LiteralCulture = CultureInfo.InvariantCulture;
 
         /// <summary>
         /// Creates a new SqlOmRenderer
@@ -137,7 +143,13 @@ public abstract class SqlOmRenderer : ISqlOmRenderer //, IClauseRendererContext
         {
             if (ctes.Count == 0) return;
 
-            builder.Append("WITH ");
+            bool anyRecursive = false;
+            for (int i = 0; i < ctes.Count; i++)
+            {
+                if (ctes[i].IsRecursive) { anyRecursive = true; break; }
+            }
+
+            builder.Append(anyRecursive ? "WITH RECURSIVE " : "WITH ");
             for (int i = 0; i < ctes.Count; i++)
             {
                 if (i > 0)
@@ -154,13 +166,13 @@ public abstract class SqlOmRenderer : ISqlOmRenderer //, IClauseRendererContext
                             builder.Append(", ");
                         Identifier(builder, cte.ColumnNames[j], true);
                     }
-                    builder.Append(")");
+                    builder.Append(')');
                 }
                 builder.Append(" AS (");
                 builder.Append(RenderSelect(cte.Query));
-                builder.Append(")");
+                builder.Append(')');
             }
-            builder.Append(" ");
+            builder.Append(' ');
         }
 
         /// <summary>
@@ -175,7 +187,7 @@ public abstract class SqlOmRenderer : ISqlOmRenderer //, IClauseRendererContext
             foreach (SqlUnionItem item in union.Items)
             {
                 if (!isFirst)
-                    builder.AppendFormat(" union {0} ", (item.RepeatingAction == DistinctModifier.All) ? "all" : "");
+                    builder.Append(item.RepeatingAction == DistinctModifier.All ? " union all " : " union ");
                 builder.Append(RenderSelect(item.Query));
                 isFirst = false;
             }
@@ -269,24 +281,23 @@ public abstract class SqlOmRenderer : ISqlOmRenderer //, IClauseRendererContext
         /// </summary>
         protected virtual void SelectColumns(StringBuilder builder, SelectColumnCollection columns)
         {
-            foreach (SelectColumn col in columns)
+            for (int i = 0; i < columns.Count; i++)
             {
-                if (col != columns[0])
+                if (i > 0)
                     Coma(builder);
-
-                SelectColumn(builder, col);
+                SelectColumn(builder, columns[i]);
             }
         }
 
         /// <summary>
-        /// Renders a sinle select column
+        /// Renders a single select column
         /// </summary>
         protected virtual void SelectColumn(StringBuilder builder, SelectColumn col)
         {
             Expression(builder, col.Expression);
             if (col.ColumnAlias != null)
             {
-                builder.Append(" ");
+                builder.Append(' ');
                 Identifier(builder, col.ColumnAlias);
             }
         }
@@ -321,12 +332,14 @@ public abstract class SqlOmRenderer : ISqlOmRenderer //, IClauseRendererContext
 
             foreach (Join join in fromClause.Joins)
             {
-                builder.AppendFormat(" {0} join ", join.Type.ToString().ToLower());
+                builder.Append(' ');
+                builder.Append(join.Type.ToString().ToLowerInvariant());
+                builder.Append(" join ");
                 RenderFromTerm(builder, join.RightTable, tableSpace);
 
                 if (join.Type != JoinType.Cross)
                 {
-                    builder.AppendFormat(" on ");
+                    builder.Append(" on ");
                     WhereClause(builder, join.Conditions);
                 }
             }
@@ -352,26 +365,47 @@ public abstract class SqlOmRenderer : ISqlOmRenderer //, IClauseRendererContext
                 Identifier(builder, nameToRender, table.RenderIdentifierQuotes);
             }
             else if (table.Type == FromTermType.SubQuery)
-                builder.AppendFormat("( {0} )", table.Expression);
-            else if (table.Type == FromTermType.SubQueryObj && table.Expression is SelectQuery)
-                builder.AppendFormat("( {0} )", RenderSelect((SelectQuery)table.Expression));
-            else if (table.Type == FromTermType.SubQueryObj && table.Expression is SqlUnion)
-                builder.AppendFormat("( {0} )", RenderUnion((SqlUnion)table.Expression));
+            {
+                builder.Append("( ");
+                builder.Append((string?)table.Expression);
+                builder.Append(" )");
+            }
+            else if (table.Type == FromTermType.SubQueryObj && table.Expression is SelectQuery sq)
+            {
+                builder.Append("( ");
+                builder.Append(RenderSelect(sq));
+                builder.Append(" )");
+            }
+            else if (table.Type == FromTermType.SubQueryObj && table.Expression is SqlUnion union)
+            {
+                builder.Append("( ");
+                builder.Append(RenderUnion(union));
+                builder.Append(" )");
+            }
             else
-                throw new InvalidQueryException("Unknown FromExpressionType: " + table.Type.ToString());
+                throw new InvalidQueryException("Unknown FromExpressionType: " + table.Type);
 
             if (table.Alias != null)
             {
-                builder.AppendFormat(" ");
+                builder.Append(' ');
                 Identifier(builder, table.Alias, table.RenderIdentifierQuotes);
             }
 
-            if (ReadUncommitted && table.Type == FromTermType.Table)
-                builder.Append(" with (nolock)");
-            else
+            ApplyTableHints(builder, table);
+        }
+
+        /// <summary>
+        /// Emits renderer-specific table hints (e.g. SQL Server's WITH (NOLOCK)).
+        /// Base implementation only emits explicit <see cref="FromTerm.LockHint"/> hints; dialect-specific
+        /// renderers override this to emit <see cref="ReadUncommitted"/> hints.
+        /// </summary>
+        protected virtual void ApplyTableHints(StringBuilder builder, FromTerm table)
+        {
+            if (table.LockHint != LockHintType.NONE)
             {
-                if (table.LockHint != LockHintType.NONE)
-                    builder.AppendFormat(" WITH ({0})", table.LockHint);
+                builder.Append(" WITH (");
+                builder.Append(table.LockHint);
+                builder.Append(')');
             }
         }
 
@@ -382,7 +416,8 @@ public abstract class SqlOmRenderer : ISqlOmRenderer //, IClauseRendererContext
         /// <param name="ns"></param>
         protected virtual void TableNamespace(StringBuilder builder, string ns)
         {
-            builder.AppendFormat("{0}.", ns);
+            builder.Append(ns);
+            builder.Append('.');
         }
 
         /// <summary>
@@ -395,7 +430,7 @@ public abstract class SqlOmRenderer : ISqlOmRenderer //, IClauseRendererContext
             if (group.IsEmpty)
                 return;
 
-            builder.AppendFormat(" where ");
+            builder.Append(" where ");
         }
 
         /// <summary>
@@ -408,7 +443,7 @@ public abstract class SqlOmRenderer : ISqlOmRenderer //, IClauseRendererContext
             if (group.IsEmpty)
                 return;
 
-            builder.AppendFormat(" having ");
+            builder.Append(" having ");
         }
 
         /// <summary>
@@ -421,7 +456,7 @@ public abstract class SqlOmRenderer : ISqlOmRenderer //, IClauseRendererContext
             if (group.IsEmpty)
                 return;
 
-            builder.AppendFormat("(");
+            builder.Append('(');
 
             for (int i = 0; i < group.Terms.Count; i++)
             {
@@ -445,7 +480,7 @@ public abstract class SqlOmRenderer : ISqlOmRenderer //, IClauseRendererContext
                 operatorRequired = true;
             }
 
-            builder.AppendFormat(")");
+            builder.Append(')');
         }
 
         /// <summary>
@@ -473,20 +508,13 @@ public abstract class SqlOmRenderer : ISqlOmRenderer //, IClauseRendererContext
                 BitwiseAnd(builder, term);
             else if (term.Type == WhereTermType.Compare)
             {
-                if (term.Expr2.Value == null)
-                {
-                    Expression(builder, term.Expr1);
-                    builder.Append(" is ");
-                    builder.Append(" null ");
-                }
-                else
-                {
-                    Expression(builder, term.Expr1);
-                    builder.Append(" ");
-                    Operator(builder, term.Op);
-                    builder.Append(" ");
-                    Expression(builder, term.Expr2);
-                }
+                // WhereTerm.CreateCompare auto-promotes null-Expr2 to WhereTermType.IsNull,
+                // so Expr2 is guaranteed non-null here.
+                Expression(builder, term.Expr1);
+                builder.Append(' ');
+                Operator(builder, term.Op);
+                builder.Append(' ');
+                Expression(builder, term.Expr2);
             }
             else if (term.Type == WhereTermType.In || term.Type == WhereTermType.NotIn || term.Type == WhereTermType.InSubQuery || term.Type == WhereTermType.NotInSubQuery || term.Type == WhereTermType.InSubQueryObj || term.Type == WhereTermType.NotInSubQueryObj)
             {
@@ -500,7 +528,7 @@ public abstract class SqlOmRenderer : ISqlOmRenderer //, IClauseRendererContext
                     builder.Append(RenderSelect((SelectQuery)term.SubQuery));
                 else
                     ConstantList(builder, term.Values);
-                builder.Append(")");
+                builder.Append(')');
             }
             else if (term.Type == WhereTermType.Exists || term.Type == WhereTermType.ExistsObj || term.Type == WhereTermType.NotExists || term.Type == WhereTermType.NotExistsObj)
             {
@@ -511,38 +539,39 @@ public abstract class SqlOmRenderer : ISqlOmRenderer //, IClauseRendererContext
                     builder.Append((string)term.SubQuery);
                 else
                     builder.Append(RenderSelect((SelectQuery)term.SubQuery));
-                builder.Append(")");
+                builder.Append(')');
             }
-            else if (term.Type == WhereTermType.Raw) //[OP] toegevoegd 29 okt '08
+            else if (term.Type == WhereTermType.Raw)
             {
-                builder.AppendFormat(" ");
+                builder.Append(' ');
                 builder.Append((string)term.SubQuery);
             }
             else if (term.Type == WhereTermType.Between)
             {
                 Expression(builder, term.Expr1);
-                builder.AppendFormat(" between ");
+                builder.Append(" between ");
                 Expression(builder, term.Expr2);
-                builder.AppendFormat(" and ");
+                builder.Append(" and ");
                 Expression(builder, term.Expr3);
             }
             else if (term.Type == WhereTermType.NotBetween)
             {
                 Expression(builder, term.Expr1);
-                builder.AppendFormat(" not between ");
+                builder.Append(" not between ");
                 Expression(builder, term.Expr2);
-                builder.AppendFormat(" and ");
+                builder.Append(" and ");
                 Expression(builder, term.Expr3);
             }
-            else if (term.Type == WhereTermType.IsNull || term.Type == WhereTermType.IsNotNull)
+            else if (term.Type == WhereTermType.IsNull)
             {
                 Expression(builder, term.Expr1);
-                builder.Append(" is ");
-                if (term.Type == WhereTermType.IsNotNull)
-                    builder.Append("not ");
-                builder.Append(" null ");
+                builder.Append(" is null ");
             }
-
+            else if (term.Type == WhereTermType.IsNotNull)
+            {
+                Expression(builder, term.Expr1);
+                builder.Append(" is not null ");
+            }
         }
 
         /// <summary>
@@ -582,15 +611,23 @@ public abstract class SqlOmRenderer : ISqlOmRenderer //, IClauseRendererContext
             else if (type == SqlExpressionType.Constant)
                 Constant(builder, (SqlConstant)expr.Value!);
             else if (type == SqlExpressionType.SubQueryText)
-                builder.AppendFormat("({0})", (string)expr.Value!);
+            {
+                builder.Append('(');
+                builder.Append((string)expr.Value!);
+                builder.Append(')');
+            }
             else if (type == SqlExpressionType.SubQueryObject)
-                builder.AppendFormat("({0})", RenderSelect((SelectQuery)expr.Value!));
+            {
+                builder.Append('(');
+                builder.Append(RenderSelect((SelectQuery)expr.Value!));
+                builder.Append(')');
+            }
             else if (type == SqlExpressionType.PseudoField)
-                builder.AppendFormat("{0}", (string)expr.Value!);
+                builder.Append((string)expr.Value!);
             else if (type == SqlExpressionType.Parameter)
-                builder.AppendFormat("{0}", (string)expr.Value!);
+                builder.Append((string)expr.Value!);
             else if (type == SqlExpressionType.Raw)
-                builder.AppendFormat("{0}", (string)expr.Value!);
+                builder.Append((string)expr.Value!);
             else if (type == SqlExpressionType.Case)
                 CaseClause(builder, expr.CaseClause);
             else if (type == SqlExpressionType.IfNull)
@@ -611,10 +648,11 @@ public abstract class SqlOmRenderer : ISqlOmRenderer //, IClauseRendererContext
         /// <param name="param"></param>
         protected virtual void Function(StringBuilder builder, SqlAggregationFunction func, SqlExpression? param)
         {
-            builder.AppendFormat("{0}(", func.ToString());
+            builder.Append(func);
+            builder.Append('(');
             if (param is not null)
                 Expression(builder, param);
-            builder.AppendFormat(")");
+            builder.Append(')');
         }
 
         /// <summary>
@@ -625,23 +663,30 @@ public abstract class SqlOmRenderer : ISqlOmRenderer //, IClauseRendererContext
         /// <param name="param"></param>
         protected virtual void Function(StringBuilder builder, SqlDatabaseFunction func, SqlExpression? param)
         {
-            builder.AppendFormat("{0}(", func.ToString());
+            builder.Append(func);
+            builder.Append('(');
             if (param is not null)
                 Expression(builder, param);
-            builder.AppendFormat(")");
+            builder.Append(')');
         }
 
+        /// <summary>
+        /// Converts a byte array to the '0x...' binary SQL literal form.
+        /// </summary>
         protected static string ByteArrayToHexString(byte[]? b)
         {
             if (b is null || b.Length == 0)
                 return "0x";
 
+#if NET5_0_OR_GREATER
+            return string.Concat("0x", Convert.ToHexString(b));
+#else
             StringBuilder sb = new(b.Length * 2 + 2);
             sb.Append("0x");
             foreach (byte val in b)
-                sb.Append(val.ToString("X2"));
-
+                sb.Append(val.ToString("X2", CultureInfo.InvariantCulture));
             return sb.ToString();
+#endif
         }
 
         /// <summary>
@@ -654,21 +699,31 @@ public abstract class SqlOmRenderer : ISqlOmRenderer //, IClauseRendererContext
             SqlDataType type = expr.Type;
 
             if (type == SqlDataType.Boolean)
-                builder.Append(((bool)expr.Value) ? "1" : "0");
-            if (type == SqlDataType.Number)
-                builder.AppendFormat(new CultureInfo("en-US"), "{0}", expr.Value);
+                builder.Append((bool)expr.Value ? "1" : "0");
+            else if (type == SqlDataType.Number)
+                builder.AppendFormat(LiteralCulture, "{0}", expr.Value);
             else if (type == SqlDataType.Guid)
-                builder.AppendFormat("'{0}'", expr.Value.ToString());
+            {
+                builder.Append('\'');
+                builder.Append(SqlEncode(expr.Value.ToString() ?? string.Empty));
+                builder.Append('\'');
+            }
             else if (type == SqlDataType.Binary)
                 builder.Append(ByteArrayToHexString((byte[])expr.Value));
             else if (type == SqlDataType.String)
-                builder.AppendFormat("'{0}'", (expr.Value == null) ? "" : expr.Value.ToString()); //builder.AppendFormat("N'{0}'", (expr.Value == null) ? "" : expr.Value.ToString());
+            {
+                builder.Append('\'');
+                builder.Append(SqlEncode(expr.Value?.ToString() ?? string.Empty));
+                builder.Append('\'');
+            }
             else if (type == SqlDataType.Date)
             {
                 DateTime val = (DateTime)expr.Value;
-                bool dateOnly = (val.Hour == 0 && val.Minute == 0 && val.Second == 0 && val.Millisecond == 0);
-                string format = (dateOnly) ? dateFormat : dateTimeFormat;
-                builder.AppendFormat("'{0}'", val.ToString(format, new CultureInfo("en-us")));
+                bool dateOnly = val.Hour == 0 && val.Minute == 0 && val.Second == 0 && val.Millisecond == 0;
+                string format = dateOnly ? dateFormat : dateTimeFormat;
+                builder.Append('\'');
+                builder.Append(val.ToString(format, LiteralCulture));
+                builder.Append('\'');
             }
         }
 
@@ -729,7 +784,9 @@ public abstract class SqlOmRenderer : ISqlOmRenderer //, IClauseRendererContext
         /// <param name="relationship"></param>
         protected virtual void RelationshipOperator(StringBuilder builder, WhereClauseRelationship relationship)
         {
-            builder.AppendFormat(" {0} ", relationship.ToString().ToLower());
+            builder.Append(' ');
+            builder.Append(relationship.ToString().ToLowerInvariant());
+            builder.Append(' ');
         }
 
         /// <summary>
@@ -751,12 +808,11 @@ public abstract class SqlOmRenderer : ISqlOmRenderer //, IClauseRendererContext
         /// <param name="groupByTerms"></param>
         protected virtual void GroupByTerms(StringBuilder builder, GroupByTermCollection groupByTerms)
         {
-            foreach (GroupByTerm clause in groupByTerms)
+            for (int i = 0; i < groupByTerms.Count; i++)
             {
-                if (clause != groupByTerms[0])
+                if (i > 0)
                     builder.Append(", ");
-
-                GroupByTerm(builder, clause);
+                GroupByTerm(builder, groupByTerms[i]);
             }
         }
 
@@ -806,9 +862,8 @@ public abstract class SqlOmRenderer : ISqlOmRenderer //, IClauseRendererContext
         /// <param name="term"></param>
         protected virtual void OrderByTerm(StringBuilder builder, OrderByTerm term)
         {
-            string dir = (term.Direction == OrderByDirection.Descending) ? "desc" : "asc";
             QualifiedIdentifier(builder, term.TableAlias, term.Field);
-            builder.AppendFormat(" {0}", dir);
+            builder.Append(term.Direction == OrderByDirection.Descending ? " desc" : " asc");
         }
 
         /// <summary>
@@ -829,18 +884,24 @@ public abstract class SqlOmRenderer : ISqlOmRenderer //, IClauseRendererContext
         /// <param name="renderIdentifierQuotes"></param>
         protected virtual void Identifier(StringBuilder builder, string name, bool renderIdentifierQuotes)
         {
-            if (name == "*" || (name.EndsWith(")") && name.LastIndexOf("(") > 0)) //[JV]Functions with parameters must not be enclosed in identifiers.
-                builder.Append(name);
-            else
+            // Functions with parameters must not be enclosed in identifier quotes.
+            if (name == "*" || (name.EndsWith(')') && name.LastIndexOf('(') > 0))
             {
-                if (UpperCaseIdentifiers)
-                    name = name.ToUpper();
-
-                if (renderIdentifierQuotes)
-                    builder.AppendFormat("{0}{1}{2}", identifierOpeningQuote, name, identifierClosingQuote);
-                else
-                    builder.AppendFormat("{0}", name);
+                builder.Append(name);
+                return;
             }
+
+            if (UpperCaseIdentifiers)
+                name = name.ToUpperInvariant();
+
+            if (renderIdentifierQuotes)
+            {
+                builder.Append(identifierOpeningQuote);
+                builder.Append(name);
+                builder.Append(identifierClosingQuote);
+            }
+            else
+                builder.Append(name);
         }
 
         /// <summary>
@@ -859,7 +920,7 @@ public abstract class SqlOmRenderer : ISqlOmRenderer //, IClauseRendererContext
             if (qnamespace is not null)
             {
                 Identifier(builder, qnamespace);
-                builder.Append(".");
+                builder.Append('.');
             }
 
             Identifier(builder, name);
@@ -884,11 +945,11 @@ public abstract class SqlOmRenderer : ISqlOmRenderer //, IClauseRendererContext
         /// <param name="terms"></param>
         protected virtual void UpdateTerms(StringBuilder builder, UpdateTermCollection terms)
         {
-            foreach (UpdateTerm updateTerm in terms)
+            for (int i = 0; i < terms.Count; i++)
             {
-                if (terms[0] != updateTerm)
+                if (i > 0)
                     Coma(builder);
-                UpdateTerm(builder, updateTerm);
+                UpdateTerm(builder, terms[i]);
             }
         }
 
@@ -940,11 +1001,11 @@ public abstract class SqlOmRenderer : ISqlOmRenderer //, IClauseRendererContext
         /// <param name="terms"></param>
         protected virtual void InsertColumns(StringBuilder builder, UpdateTermCollection terms)
         {
-            foreach (UpdateTerm term in terms)
+            for (int i = 0; i < terms.Count; i++)
             {
-                if (terms[0] != term)
+                if (i > 0)
                     Coma(builder);
-                InsertColumn(builder, term);
+                InsertColumn(builder, terms[i]);
             }
         }
 
@@ -965,11 +1026,11 @@ public abstract class SqlOmRenderer : ISqlOmRenderer //, IClauseRendererContext
         /// <param name="terms"></param>
         protected virtual void InsertValues(StringBuilder builder, UpdateTermCollection terms)
         {
-            foreach (UpdateTerm term in terms)
+            for (int i = 0; i < terms.Count; i++)
             {
-                if (terms[0] != term)
+                if (i > 0)
                     Coma(builder);
-                InsertValue(builder, term);
+                InsertValue(builder, terms[i]);
             }
         }
 
@@ -994,11 +1055,11 @@ public abstract class SqlOmRenderer : ISqlOmRenderer //, IClauseRendererContext
             StringBuilder builder = new();
             Insert(builder, query.TableName);
 
-            builder.Append("(");
+            builder.Append('(');
             InsertColumns(builder, query.Terms);
             builder.Append(") values (");
             InsertValues(builder, query.Terms);
-            builder.Append(")");
+            builder.Append(')');
             return builder.ToString();
         }
 
@@ -1073,61 +1134,22 @@ public abstract class SqlOmRenderer : ISqlOmRenderer //, IClauseRendererContext
             StringBuilder builder = new();
             Insert(builder, query.TableName);
 
-            builder.Append("(");
+            builder.Append('(');
             // First build the columns using the first query (since all fields should be the same).
             InsertColumns(builder, query.Terms[0].Terms);
             builder.Append(") values ");
 
             // Next build the values
-            bool isFirst = true;
-            foreach (InsertQuery insertQuery in query.Terms)
+            for (int i = 0; i < query.Terms.Count; i++)
             {
-                if (!isFirst)
+                if (i > 0)
                     Coma(builder);
 
-                builder.Append("(");
-                InsertValues(builder, insertQuery.Terms);
-                builder.Append(")");
-                isFirst = false;
+                builder.Append('(');
+                InsertValues(builder, query.Terms[i].Terms);
+                builder.Append(')');
             }
 
             return builder.ToString();
         }
-
-        /*    protected void SelectModifiers(StringBuilder builder, SelectQuery query)
-            {
-            }
-
-            protected void GroupByModifiers(StringBuilder builder, SelectQuery query)
-            {
-            }
-
-            //protected void SelectStatement(StringBuilder builder, bool distinct, int top, SelectColumnCollection columns, FromClause from, WhereClause where, GroupByTermCollection groupBy, bool withCube, bool withRollup, OrderByTermCollection orderBy, WhereClause having)
-            protected void SelectStatement(StringBuilder builder, SelectQuery query)
-            {
-              query.Validate();
-
-              StringBuilder selectBuilder = new StringBuilder();
-
-              //Start the select statement
-              Select(selectBuilder, query.Distinct);
-              SelectModifiers(selectBuilder, query);
-              SelectColumns(selectBuilder, query.Columns);
-
-              this.FromClause(selectBuilder, query.FromClause, query.TableSpace);
-
-              this.Where(selectBuilder, query.WherePhrase);
-              this.WhereClause(selectBuilder, query.WherePhrase);
-
-              GroupBy(selectBuilder, query.GroupByTerms);
-              GroupByTerms(selectBuilder, query.GroupByTerms);
-              GroupByModifiers(selectBuilder, query);
-
-              Having(selectBuilder, query.HavingPhrase);
-              WhereClause(selectBuilder, query.HavingPhrase);
-
-              OrderBy(selectBuilder, query.OrderByTerms);
-              OrderByTerms(selectBuilder, query.OrderByTerms);
-            }
-        */
     }
