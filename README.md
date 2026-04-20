@@ -1,7 +1,7 @@
 # SqlOM
 
 [![NuGet](https://img.shields.io/nuget/v/SqlOM.svg)](https://www.nuget.org/packages/SqlOM)
-[![.NET](https://img.shields.io/badge/.NET-netstandard2.1%20%7C%208.0%20%7C%209.0-blue.svg)](https://dotnet.microsoft.com/download)
+[![.NET](https://img.shields.io/badge/.NET-9.0-blue.svg)](https://dotnet.microsoft.com/download)
 
 **Generate dynamic SQL queries using C# code only**
 
@@ -924,7 +924,7 @@ string sql = renderer.RenderSelect(drillDownQuery);
 
 ## Requirements
 
-- .NET Standard 2.1, .NET 8.0, or .NET 9.0
+- .NET 9.0 or higher
 
 ## License
 
@@ -945,6 +945,7 @@ Contributions are welcome! If you find a bug or have a feature request, please o
   - The typed nested `Enumerator` classes (e.g. `WhereTermCollection.WhereClauseEnumerator`) were removed — use `foreach` or `IEnumerator<T>`.
   - The "copy from same collection type" constructor now accepts `IEnumerable<T>` (which still covers same-type collections, plus arrays and any other enumerable).
   - `AddRange` now accepts `IEnumerable<T>` (covers arrays and collections of the same element type).
+- Target framework is now `net9.0` only. The `netstandard2.1` and `net8.0` targets have been dropped — consumers must target .NET 9 or higher.
 - Recompilation against the 2.0 assembly is required. Source code that uses the typical patterns compiles unchanged in nearly all cases.
 
 **New features**

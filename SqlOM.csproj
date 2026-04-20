@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFrameworks>netstandard2.1;net8.0;net9.0</TargetFrameworks>
+    <TargetFramework>net9.0</TargetFramework>
     <LangVersion>latest</LangVersion>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
@@ -29,6 +29,7 @@
 
       BREAKING:
       • All built-in collection types now derive from System.Collections.ObjectModel.Collection&lt;T&gt; instead of the legacy CollectionBase. The strongly-typed methods (Add, Contains, IndexOf, Insert, Remove, indexer, foreach) keep working, but Add(T) now returns void instead of int, the typed nested Enumerator classes were removed (use foreach), and the constructor that took the same collection type now accepts IEnumerable&lt;T&gt;. AddRange now accepts IEnumerable&lt;T&gt; (covers both arrays and other collections of the same element type).
+      • Target framework is now net9.0 only (netstandard2.1 and net8.0 dropped). Consumers must target .NET 9 or higher.
       • Recompilation against the 2.0 assembly is required. Source code that uses the typical patterns (Add, foreach, [], Count, Clear) compiles unchanged.
 
       New:
