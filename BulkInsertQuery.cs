@@ -32,8 +32,8 @@ namespace Reeb.SqlOM
     [DebuggerDisplay("SQL = {SQL}")]
     public class BulkInsertQuery
     {
-        InsertQueryCollection terms = new InsertQueryCollection();
-        string tableName;
+        readonly InsertQueryCollection terms = new InsertQueryCollection();
+        string? tableName;
 
         /// <summary>
         /// Used for debugger purposes only
@@ -53,7 +53,7 @@ namespace Reeb.SqlOM
         /// Create a BulkInsertQuery and resets alias tracking for Table&lt;T&gt;().
         /// </summary>
         /// <param name="tableName">The name of the table to be inserted into</param>
-        public BulkInsertQuery(string tableName)
+        public BulkInsertQuery(string? tableName)
         {
             SqlOMExtensions.ResetAliases();
             this.tableName = tableName;
@@ -73,7 +73,7 @@ namespace Reeb.SqlOM
         /// <summary>
         /// Gets or set the name of a table to be inserted into
         /// </summary>
-        public string TableName
+        public string? TableName
         {
             get { return this.tableName; }
             set { this.tableName = value; }

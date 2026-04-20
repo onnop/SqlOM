@@ -20,8 +20,8 @@ namespace Reeb.SqlOM
     [DebuggerDisplay("SQL = {SQL}")]
     public class DeleteQuery
     {
-        string tableName;
-        WhereClause whereClause = new WhereClause(WhereClauseRelationship.And);
+        string? tableName;
+        readonly WhereClause whereClause = new WhereClause(WhereClauseRelationship.And);
 
         /// <summary>
         /// Used for debugger purposes only
@@ -41,7 +41,7 @@ namespace Reeb.SqlOM
         /// Creates a DeleteQuery and resets alias tracking for Table&lt;T&gt;().
         /// </summary>
         /// <param name="tableName">Name of the table records are to be deleted from</param>
-        public DeleteQuery(string tableName)
+        public DeleteQuery(string? tableName)
         {
             SqlOMExtensions.ResetAliases();
             this.tableName = tableName;
@@ -58,7 +58,7 @@ namespace Reeb.SqlOM
         /// <summary>
         /// Gets or set the name of a table records are to be deleted from
         /// </summary>
-        public string TableName
+        public string? TableName
         {
             get { return this.tableName; }
             set { this.tableName = value; }

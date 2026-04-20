@@ -1,43 +1,61 @@
-using System.Collections;
+using System.Collections.ObjectModel;
 
-namespace Reeb.SqlOM
+namespace Reeb.SqlOM;
+
+/// <summary>
+/// A strongly-typed collection of <see cref="CommonTableExpression"/> objects.
+/// </summary>
+[Serializable]
+public class CommonTableExpressionCollection : Collection<CommonTableExpression>
 {
     /// <summary>
-    /// A collection of Common Table Expressions
+    /// Creates a new, empty <see cref="CommonTableExpressionCollection"/>.
     /// </summary>
-    public class CommonTableExpressionCollection : CollectionBase
+    public CommonTableExpressionCollection()
     {
-        /// <summary>
-        /// Adds a CTE to the collection
-        /// </summary>
-        /// <param name="cte">The CTE to add</param>
-        public void Add(CommonTableExpression cte)
-        {
-            List.Add(cte);
-        }
+    }
 
-        /// <summary>
-        /// Gets a CTE at the specified index
-        /// </summary>
-        /// <param name="index">The index</param>
-        /// <returns>The CTE at the index</returns>
-        public CommonTableExpression this[int index]
-        {
-            get { return (CommonTableExpression)List[index]; }
-        }
+    /// <summary>
+    /// Creates a new <see cref="CommonTableExpressionCollection"/> populated from <paramref name="items"/>.
+    /// </summary>
+    public CommonTableExpressionCollection(IEnumerable<CommonTableExpression> items)
+    {
+        if (items is null) throw new ArgumentNullException(nameof(items));
+        foreach (var item in items) Add(item);
+    }
 
-        /// <summary>
-        /// Clones the CTE collection
-        /// </summary>
-        /// <returns>A new collection with cloned CTEs</returns>
-        public CommonTableExpressionCollection Clone()
+    /// <summary>
+    /// Creates a new <see cref="CommonTableExpressionCollection"/> populated from <paramref name="items"/>.
+    /// </summary>
+    public CommonTableExpressionCollection(CommonTableExpression[] items)
+        : this((IEnumerable<CommonTableExpression>)items)
+    {
+    }
+
+    /// <summary>
+    /// Adds the elements of <paramref name="items"/> to the end of this collection.
+    /// </summary>
+    public void AddRange(IEnumerable<CommonTableExpression> items)
+    {
+        if (items is null) throw new ArgumentNullException(nameof(items));
+        foreach (var item in items) Add(item);
+    }
+
+    /// <summary>
+    /// Returns a deep copy of this collection. Each contained CTE is cloned (including
+    /// its <see cref="CommonTableExpression.IsRecursive"/> flag and any column-name list).
+    /// </summary>
+    public CommonTableExpressionCollection Clone()
+    {
+        var copy = new CommonTableExpressionCollection();
+        foreach (var cte in this)
         {
-            CommonTableExpressionCollection newCollection = new();
-            foreach (CommonTableExpression cte in this)
-            {
-                newCollection.Add(new CommonTableExpression(cte.Name, cte.Query.Clone(), cte.ColumnNames));
-            }
-            return newCollection;
+            CommonTableExpression cloned = cte.ColumnNames is { Length: > 0 }
+                ? new CommonTableExpression(cte.Name, cte.Query.Clone(), cte.ColumnNames)
+                : new CommonTableExpression(cte.Name, cte.Query.Clone());
+            cloned.IsRecursive = cte.IsRecursive;
+            copy.Add(cloned);
         }
+        return copy;
     }
 }

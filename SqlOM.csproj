@@ -25,6 +25,30 @@
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageTags>SQL;SQL-Generator;Query-Builder;Dynamic-SQL;Database;ORM;SQL-Server;Oracle;MySQL;MariaDB;SQLite;PostgreSQL;CTE;Fluent-API;LINQ;Modern-CSharp</PackageTags>
     <PackageReleaseNotes>
+      Version 2.0.0 - Modernised collections and parameterised rendering
+
+      BREAKING:
+      • All built-in collection types now derive from System.Collections.ObjectModel.Collection&lt;T&gt; instead of the legacy CollectionBase. The strongly-typed methods (Add, Contains, IndexOf, Insert, Remove, indexer, foreach) keep working, but Add(T) now returns void instead of int, the typed nested Enumerator classes were removed (use foreach), and the constructor that took the same collection type now accepts IEnumerable&lt;T&gt;. AddRange now accepts IEnumerable&lt;T&gt; (covers both arrays and other collections of the same element type).
+      • Recompilation against the 2.0 assembly is required. Source code that uses the typical patterns (Add, foreach, [], Count, Clear) compiles unchanged.
+
+      New:
+      • RenderedCommand / RenderedParameter and RenderSelectCommand / RenderInsertCommand / RenderUpdateCommand / RenderDeleteCommand / RenderBulkInsertCommand on every renderer. These return SQL with parameter placeholders (@p0, @p1, ...) plus the captured constant values, so query output can be safely bound through ADO.NET / Dapper / Npgsql / etc. instead of inlining literals.
+      • Oracle uses :p0 placeholders; SQL Server / MySQL / SQLite / PostgreSQL use @p0. Override SqlOmRenderer.FormatParameterName(int) to customise.
+      • SqlOMExtensions.BeginAliasScope() now reliably isolates auto-generated aliases for nested or parallel query construction; sub-query constructors no longer wipe the parent scope's alias counter.
+      • CommonTableExpressionCollection.Clone() now preserves CommonTableExpression.IsRecursive (previously silently dropped).
+
+      Version 1.2.0 - Nullability, SQLite parity, and identifier hardening
+
+      New:
+      • Full C# nullable-reference-type annotations across public API (FromTerm, SelectColumn, OrderByTerm, GroupByTerm, UpdateTerm, WhereTerm, SqlExpression, DeleteQuery, InsertQuery, UpdateQuery, BulkInsertQuery)
+      • SqlOMExtensions.BeginAliasScope() - IDisposable scope for nested/parallel query building without cross-contaminating auto-generated aliases
+      • SQLiteRenderer rewritten: supports CTEs, LIMIT/OFFSET paging, RenderPage, and ifnull(); rejects WITH CUBE/ROLLUP with a clear exception instead of emitting invalid SQL
+
+      Fixed:
+      • Identifier() now escapes the closing-quote character (] " `) inside identifier bodies (defense-in-depth against identifier injection)
+      • SQLiteRenderer.Constant() now uses InvariantCulture, applies SqlEncode, and has the missing 'else' guard that the base had before 1.1.0
+      • Various APIs that accepted null by convention are now correctly typed as nullable (e.g. SelectColumn ctor table parameter, FromTerm.Table overloads, OrderByTerm/GroupByTerm table parameter)
+
       Version 1.1.0 - Correctness, performance, and security release
 
       New:
@@ -47,7 +71,7 @@
       • Index-based iteration replaces "if (item != collection[0])" anti-pattern
       • Removed dead commented-out code blocks
     </PackageReleaseNotes>
-    <Version>1.1.0</Version>
+    <Version>2.0.0</Version>
     <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
 
     <!-- Symbol packages / Source Link -->

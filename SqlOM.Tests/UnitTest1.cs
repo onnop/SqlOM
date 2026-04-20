@@ -214,6 +214,65 @@ public class BasicTests
     }
 
     [Fact]
+    public void TestRenderSelectCommand_CapturesParameters()
+    {
+        var query = new SelectQuery();
+        query.Columns.Add(new SelectColumn("name"));
+        query.FromClause.BaseTable = FromTerm.Table("customers");
+        query.WherePhrase.Terms.Add(WhereTerm.CreateCompare(
+            SqlExpression.Field("city"), SqlExpression.String("New York"), CompareOperator.Equal));
+        query.WherePhrase.Terms.Add(WhereTerm.CreateCompare(
+            SqlExpression.Field("age"), SqlExpression.Number(30), CompareOperator.Greater));
+
+        var renderer = new SqlServerRenderer();
+        var cmd = renderer.RenderSelectCommand(query);
+
+        Assert.Contains("@p0", cmd.Sql);
+        Assert.Contains("@p1", cmd.Sql);
+        Assert.DoesNotContain("'New York'", cmd.Sql);
+        Assert.DoesNotContain("30", cmd.Sql);
+        Assert.Equal(2, cmd.Parameters.Count);
+        Assert.Equal("@p0", cmd.Parameters[0].Name);
+        Assert.Equal("New York", cmd.Parameters[0].Value);
+        Assert.Equal("@p1", cmd.Parameters[1].Name);
+        Assert.Equal(30d, Convert.ToDouble(cmd.Parameters[1].Value));
+    }
+
+    [Fact]
+    public void TestRenderSelectCommand_OracleUsesColonPrefix()
+    {
+        var query = new SelectQuery();
+        query.Columns.Add(new SelectColumn("name"));
+        query.FromClause.BaseTable = FromTerm.Table("customers");
+        query.WherePhrase.Terms.Add(WhereTerm.CreateCompare(
+            SqlExpression.Field("city"), SqlExpression.String("Boston"), CompareOperator.Equal));
+
+        var cmd = new OracleRenderer().RenderSelectCommand(query);
+
+        Assert.Contains(":p0", cmd.Sql);
+        Assert.DoesNotContain("'Boston'", cmd.Sql);
+        Assert.Single(cmd.Parameters);
+        Assert.Equal(":p0", cmd.Parameters[0].Name);
+    }
+
+    [Fact]
+    public void TestRenderSelectCommand_DoesNotAffectInlineRender()
+    {
+        var query = new SelectQuery();
+        query.Columns.Add(new SelectColumn("name"));
+        query.FromClause.BaseTable = FromTerm.Table("customers");
+        query.WherePhrase.Terms.Add(WhereTerm.CreateCompare(
+            SqlExpression.Field("city"), SqlExpression.String("Paris"), CompareOperator.Equal));
+
+        var renderer = new SqlServerRenderer();
+        var cmd = renderer.RenderSelectCommand(query);
+
+        var inlineSql = renderer.RenderSelect(query);
+        Assert.Contains("N'Paris'", inlineSql);
+        Assert.DoesNotContain("@p0", inlineSql);
+    }
+
+    [Fact]
     public void TestFluentApi()
     {
         var table = FromTerm.Table<Customer>("c");

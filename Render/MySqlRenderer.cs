@@ -26,10 +26,12 @@ namespace Reeb.SqlOM.Render
         protected override void IfNull(StringBuilder builder, SqlExpression expr)
         {
             builder.Append("ifnull(");
-            Expression(builder, expr.SubExpr1);
+            if (expr.SubExpr1 is not null)
+                Expression(builder, expr.SubExpr1);
             builder.Append(", ");
-            Expression(builder, expr.SubExpr2);
-            builder.Append(")");
+            if (expr.SubExpr2 is not null)
+                Expression(builder, expr.SubExpr2);
+            builder.Append(')');
         }
 
         /// <summary>
@@ -86,32 +88,11 @@ namespace Reeb.SqlOM.Render
             this.OrderByTerms(selectBuilder, query.OrderByTerms);
 
             if (limitRows > -1)
-                selectBuilder.AppendFormat(" limit {0}, {1}", offset, limitRows);
+                selectBuilder.AppendFormat(LiteralCulture, " limit {0}, {1}", offset, limitRows);
 
             return selectBuilder.ToString();
         }
-        /*
-        void RenderFromPhrase(StringBuilder builder, FromClause fromClause)
-        {
-          this.From(builder);
 
-          this.FromTerm(builder, fromClause.BaseTable);
-
-          foreach(Join join in fromClause.Joins)
-          {
-            builder.AppendFormat(" {0} join ", join.Type.ToString().ToLower());
-            this.FromTerm(builder, join.RightTable);
-
-            if (join.Type != JoinType.Cross)
-            {
-              builder.AppendFormat(" on ");
-              this.QualifiedIdentifier(builder, join.LeftTable.RefName, join.LeftField);
-              builder.AppendFormat(" = ");
-              this.QualifiedIdentifier(builder, join.RightTable.RefName, join.RightField);
-            }
-          }
-        }
-    */
         /// <summary>
         /// Renders a row count SELECT statement. 
         /// </summary>

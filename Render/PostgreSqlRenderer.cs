@@ -104,7 +104,7 @@ public class PostgreSqlRenderer : SqlOmRenderer
         string baseSql = RenderSelect(query);
 
         SelectQuery countQuery = new SelectQuery();
-        SelectColumn col = new SelectColumn("*", null!, "cnt", SqlAggregationFunction.Count);
+        SelectColumn col = new SelectColumn("*", (FromTerm?)null, "cnt", SqlAggregationFunction.Count);
         countQuery.Columns.Add(col);
         countQuery.FromClause.BaseTable = FromTerm.SubQuery(baseSql, "t");
         return RenderSelect(countQuery);

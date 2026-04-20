@@ -144,7 +144,7 @@ internal enum SqlExpressionType
         /// <returns>A SqlExpression which represents a textual value</returns>
         public static SqlExpression String(string? val)
         {
-            return Constant(SqlConstant.String(string.IsNullOrEmpty(val) ? val : val.Replace("\'", "\'\'")));
+            return Constant(SqlConstant.String(string.IsNullOrEmpty(val) ? val! : val.Replace("\'", "\'\'")));
         }
 
         /// <summary>
@@ -206,7 +206,7 @@ internal enum SqlExpressionType
             switch (val.GetType().Name)
             {
                 case "String":
-                    val = val.ToString().Replace("\'", "\'\'");
+                    val = val.ToString()!.Replace("\'", "\'\'");
                     dataType = SqlDataType.String;
                     break;
                 case "Int16":
@@ -226,7 +226,7 @@ internal enum SqlExpressionType
                     dataType = SqlDataType.Binary;
                     break;
                 default:
-                    val = val.ToString().Replace("\'", "\'\'");
+                    val = val.ToString()!.Replace("\'", "\'\'");
                     dataType = SqlDataType.String;
                     break;
             }
@@ -315,7 +315,7 @@ internal enum SqlExpressionType
         /// <param name="fieldName">Name of a field</param>
         /// <param name="table">The table this field belongs to</param>
         /// <returns></returns>
-        public static SqlExpression Field(string fieldName, FromTerm table)
+        public static SqlExpression Field(string fieldName, FromTerm? table)
         {
             SqlExpression expr = new SqlExpression();
             expr.val = fieldName;
@@ -328,7 +328,7 @@ internal enum SqlExpressionType
         /// Creates a SqlExpression for a typed property field.
         /// Uses [ColumnName] attribute or property name.
         /// </summary>
-        public static SqlExpression Field<T>(System.Linq.Expressions.Expression<Func<T, object?>> expression, FromTerm table)
+        public static SqlExpression Field<T>(System.Linq.Expressions.Expression<Func<T, object?>> expression, FromTerm? table)
         {
             return Field(SqlOMExtensions.ColumnName<T>(expression), table);
         }

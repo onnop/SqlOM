@@ -133,6 +133,110 @@ public abstract class SqlOmRenderer : ISqlOmRenderer
             return DeleteStatement(query);
         }
 
+        // -----------------------------------------------------------------------------
+        // Parameterised rendering (RenderedCommand)
+        // -----------------------------------------------------------------------------
+
+        /// <summary>
+        /// Per-thread parameter-capture context. When non-null, calls to
+        /// <see cref="RenderConstantOrParameter"/> emit a placeholder name and record the value
+        /// instead of dispatching to <see cref="Constant"/>.
+        /// </summary>
+        [ThreadStatic]
+        private static ParameterCaptureContext? _captureContext;
+
+        /// <summary>
+        /// Captures parameters during a single render operation. Use within a
+        /// <c>try / finally</c> block so that the prior context is restored on completion.
+        /// </summary>
+        private sealed class ParameterCaptureContext
+        {
+            public List<RenderedParameter> Parameters { get; } = new();
+            public Func<int, string> NameFactory { get; }
+
+            public ParameterCaptureContext(Func<int, string> nameFactory)
+            {
+                NameFactory = nameFactory;
+            }
+        }
+
+        /// <summary>
+        /// Returns the parameter placeholder name for the parameter at the given zero-based index.
+        /// Override per dialect (Oracle uses <c>:p0</c>, PostgreSQL/Npgsql accepts <c>@p0</c> or <c>$1</c>;
+        /// the default <c>@pN</c> works for SQL Server, MySQL/MariaDB, SQLite, and Npgsql).
+        /// </summary>
+        /// <param name="index">Zero-based parameter ordinal.</param>
+        /// <returns>The placeholder name to embed in the SQL string and use as the parameter name.</returns>
+        protected virtual string FormatParameterName(int index) => "@p" + index.ToString(CultureInfo.InvariantCulture);
+
+        /// <summary>
+        /// Either records the constant as a parameter (when a capture context is active) or
+        /// dispatches to <see cref="Constant"/> to emit it as an inline literal.
+        /// </summary>
+        /// <param name="builder">Output buffer.</param>
+        /// <param name="value">The constant to render or capture.</param>
+        protected void RenderConstantOrParameter(StringBuilder builder, SqlConstant value)
+        {
+            var ctx = _captureContext;
+            if (ctx is null)
+            {
+                Constant(builder, value);
+                return;
+            }
+
+            string name = ctx.NameFactory(ctx.Parameters.Count);
+            ctx.Parameters.Add(new RenderedParameter(name, value.Value, value.Type));
+            builder.Append(name);
+        }
+
+        /// <summary>
+        /// Renders a SELECT statement and captures all literal constants as parameters.
+        /// </summary>
+        /// <param name="query">Query definition.</param>
+        /// <returns>The rendered SQL together with the captured parameters.</returns>
+        public virtual RenderedCommand RenderSelectCommand(SelectQuery query)
+            => CaptureCommand(() => RenderSelect(query));
+
+        /// <summary>
+        /// Renders an UPDATE statement and captures all literal constants as parameters.
+        /// </summary>
+        public virtual RenderedCommand RenderUpdateCommand(UpdateQuery query)
+            => CaptureCommand(() => RenderUpdate(query));
+
+        /// <summary>
+        /// Renders an INSERT statement and captures all literal constants as parameters.
+        /// </summary>
+        public virtual RenderedCommand RenderInsertCommand(InsertQuery query)
+            => CaptureCommand(() => RenderInsert(query));
+
+        /// <summary>
+        /// Renders a BULK INSERT statement and captures all literal constants as parameters.
+        /// </summary>
+        public virtual RenderedCommand RenderBulkInsertCommand(BulkInsertQuery query)
+            => CaptureCommand(() => RenderBulkInsert(query));
+
+        /// <summary>
+        /// Renders a DELETE statement and captures all literal constants as parameters.
+        /// </summary>
+        public virtual RenderedCommand RenderDeleteCommand(DeleteQuery query)
+            => CaptureCommand(() => RenderDelete(query));
+
+        private RenderedCommand CaptureCommand(Func<string> render)
+        {
+            var ctx = new ParameterCaptureContext(FormatParameterName);
+            var previous = _captureContext;
+            _captureContext = ctx;
+            try
+            {
+                string sql = render();
+                return new RenderedCommand(sql, ctx.Parameters);
+            }
+            finally
+            {
+                _captureContext = previous;
+            }
+        }
+
 
         /// <summary>
         /// Renders Common Table Expressions
@@ -325,10 +429,10 @@ public abstract class SqlOmRenderer : ISqlOmRenderer
         /// <param name="builder"></param>
         /// <param name="fromClause"></param>
         /// <param name="tableSpace">Common prefix for all tables in the clause</param>
-        protected virtual void FromClause(StringBuilder builder, FromClause fromClause, string tableSpace)
+        protected virtual void FromClause(StringBuilder builder, FromClause fromClause, string? tableSpace)
         {
             From(builder);
-            RenderFromTerm(builder, fromClause.BaseTable, tableSpace);
+            RenderFromTerm(builder, fromClause.BaseTable!, tableSpace);
 
             foreach (Join join in fromClause.Joins)
             {
@@ -351,7 +455,7 @@ public abstract class SqlOmRenderer : ISqlOmRenderer
         /// <param name="builder"></param>
         /// <param name="table"></param>
         /// <param name="tableSpace">Common prefix for all tables in the term</param>
-        protected virtual void RenderFromTerm(StringBuilder builder, FromTerm table, string tableSpace)
+        protected virtual void RenderFromTerm(StringBuilder builder, FromTerm table, string? tableSpace)
         {
             if (table.Type == FromTermType.Table)
             {
@@ -490,10 +594,10 @@ public abstract class SqlOmRenderer : ISqlOmRenderer
         /// <param name="term"></param>
         protected virtual void BitwiseAnd(StringBuilder builder, WhereTerm term)
         {
-            builder.Append("(");
-            Expression(builder, term.Expr1);
+            builder.Append('(');
+            Expression(builder, term.Expr1!);
             builder.Append(" & ");
-            Expression(builder, term.Expr2);
+            Expression(builder, term.Expr2!);
             builder.Append(") > 0");
         }
 
@@ -510,24 +614,24 @@ public abstract class SqlOmRenderer : ISqlOmRenderer
             {
                 // WhereTerm.CreateCompare auto-promotes null-Expr2 to WhereTermType.IsNull,
                 // so Expr2 is guaranteed non-null here.
-                Expression(builder, term.Expr1);
+                Expression(builder, term.Expr1!);
                 builder.Append(' ');
                 Operator(builder, term.Op);
                 builder.Append(' ');
-                Expression(builder, term.Expr2);
+                Expression(builder, term.Expr2!);
             }
             else if (term.Type == WhereTermType.In || term.Type == WhereTermType.NotIn || term.Type == WhereTermType.InSubQuery || term.Type == WhereTermType.NotInSubQuery || term.Type == WhereTermType.InSubQueryObj || term.Type == WhereTermType.NotInSubQueryObj)
             {
-                Expression(builder, term.Expr1);
+                Expression(builder, term.Expr1!);
                 if (term.Type == WhereTermType.NotIn || term.Type == WhereTermType.NotInSubQuery || term.Type == WhereTermType.NotInSubQueryObj)
                     builder.Append(" not");
                 builder.Append(" in (");
                 if (term.Type == WhereTermType.InSubQuery || term.Type == WhereTermType.NotInSubQuery)
-                    builder.Append((string)term.SubQuery);
+                    builder.Append((string)term.SubQuery!);
                 else if (term.Type == WhereTermType.InSubQueryObj || term.Type == WhereTermType.NotInSubQueryObj)
-                    builder.Append(RenderSelect((SelectQuery)term.SubQuery));
+                    builder.Append(RenderSelect((SelectQuery)term.SubQuery!));
                 else
-                    ConstantList(builder, term.Values);
+                    ConstantList(builder, term.Values!);
                 builder.Append(')');
             }
             else if (term.Type == WhereTermType.Exists || term.Type == WhereTermType.ExistsObj || term.Type == WhereTermType.NotExists || term.Type == WhereTermType.NotExistsObj)
@@ -536,40 +640,40 @@ public abstract class SqlOmRenderer : ISqlOmRenderer
                     builder.Append(" not");
                 builder.Append(" exists (");
                 if (term.Type == WhereTermType.Exists || term.Type == WhereTermType.NotExists)
-                    builder.Append((string)term.SubQuery);
+                    builder.Append((string)term.SubQuery!);
                 else
-                    builder.Append(RenderSelect((SelectQuery)term.SubQuery));
+                    builder.Append(RenderSelect((SelectQuery)term.SubQuery!));
                 builder.Append(')');
             }
             else if (term.Type == WhereTermType.Raw)
             {
                 builder.Append(' ');
-                builder.Append((string)term.SubQuery);
+                builder.Append((string)term.SubQuery!);
             }
             else if (term.Type == WhereTermType.Between)
             {
-                Expression(builder, term.Expr1);
+                Expression(builder, term.Expr1!);
                 builder.Append(" between ");
-                Expression(builder, term.Expr2);
+                Expression(builder, term.Expr2!);
                 builder.Append(" and ");
-                Expression(builder, term.Expr3);
+                Expression(builder, term.Expr3!);
             }
             else if (term.Type == WhereTermType.NotBetween)
             {
-                Expression(builder, term.Expr1);
+                Expression(builder, term.Expr1!);
                 builder.Append(" not between ");
-                Expression(builder, term.Expr2);
+                Expression(builder, term.Expr2!);
                 builder.Append(" and ");
-                Expression(builder, term.Expr3);
+                Expression(builder, term.Expr3!);
             }
             else if (term.Type == WhereTermType.IsNull)
             {
-                Expression(builder, term.Expr1);
+                Expression(builder, term.Expr1!);
                 builder.Append(" is null ");
             }
             else if (term.Type == WhereTermType.IsNotNull)
             {
-                Expression(builder, term.Expr1);
+                Expression(builder, term.Expr1!);
                 builder.Append(" is not null ");
             }
         }
@@ -585,7 +689,7 @@ public abstract class SqlOmRenderer : ISqlOmRenderer
         /// <remarks>The default implementation always throws an exception: implementation must occcur at the inheritor.</remarks>
         /// <param name="builder">The builder to append the expression to.</param>
         /// <param name="expression">The expression to be build.</param>
-        /// <seealso cref="http://msdn.microsoft.com/en-us/library/ms189794.aspx"/>
+        /// <seealso href="https://learn.microsoft.com/en-us/sql/t-sql/functions/datediff-transact-sql"/>
         protected virtual void DateDiff(StringBuilder builder, SqlExpression expression)
         {
             throw new NotImplementedException();
@@ -609,7 +713,7 @@ public abstract class SqlOmRenderer : ISqlOmRenderer
                     Function(builder, expr.AggFunction, expr.SubExpr1);
             }
             else if (type == SqlExpressionType.Constant)
-                Constant(builder, (SqlConstant)expr.Value!);
+                RenderConstantOrParameter(builder, (SqlConstant)expr.Value!);
             else if (type == SqlExpressionType.SubQueryText)
             {
                 builder.Append('(');
@@ -760,7 +864,7 @@ public abstract class SqlOmRenderer : ISqlOmRenderer
             for (int i = 0; i < values.Count; i++)
             {
                 SqlConstant val = values[i];
-                Constant(builder, val);
+                RenderConstantOrParameter(builder, val);
                 if (i != values.Count - 1)
                     Coma(builder);
             }
@@ -897,11 +1001,33 @@ public abstract class SqlOmRenderer : ISqlOmRenderer
             if (renderIdentifierQuotes)
             {
                 builder.Append(identifierOpeningQuote);
-                builder.Append(name);
+                // Defense-in-depth: escape the closing quote character inside the identifier
+                // by doubling it (standard SQL rule for [], "" and ``).
+                EncodeIdentifier(builder, name, identifierClosingQuote);
                 builder.Append(identifierClosingQuote);
             }
             else
                 builder.Append(name);
+        }
+
+        /// <summary>
+        /// Appends an identifier body to the builder, escaping the closing-quote character by doubling it.
+        /// </summary>
+        static void EncodeIdentifier(StringBuilder builder, string name, char closingQuote)
+        {
+            if (name.IndexOf(closingQuote) < 0)
+            {
+                builder.Append(name);
+                return;
+            }
+
+            for (int i = 0; i < name.Length; i++)
+            {
+                char c = name[i];
+                if (c == closingQuote)
+                    builder.Append(closingQuote);
+                builder.Append(c);
+            }
         }
 
         /// <summary>
@@ -974,7 +1100,7 @@ public abstract class SqlOmRenderer : ISqlOmRenderer
         {
             query.Validate();
             StringBuilder builder = new();
-            Update(builder, query.TableName);
+            Update(builder, query.TableName!);
             UpdateTerms(builder, query.Terms);
             Where(builder, query.WhereClause);
             WhereClause(builder, query.WhereClause);
@@ -1053,7 +1179,7 @@ public abstract class SqlOmRenderer : ISqlOmRenderer
         {
             query.Validate();
             StringBuilder builder = new();
-            Insert(builder, query.TableName);
+            Insert(builder, query.TableName!);
 
             builder.Append('(');
             InsertColumns(builder, query.Terms);
@@ -1084,7 +1210,7 @@ public abstract class SqlOmRenderer : ISqlOmRenderer
         {
             query.Validate();
             StringBuilder builder = new();
-            Delete(builder, query.TableName);
+            Delete(builder, query.TableName!);
             Where(builder, query.WhereClause);
             WhereClause(builder, query.WhereClause);
             return builder.ToString();
@@ -1132,7 +1258,7 @@ public abstract class SqlOmRenderer : ISqlOmRenderer
         {
             query.Validate();
             StringBuilder builder = new();
-            Insert(builder, query.TableName);
+            Insert(builder, query.TableName!);
 
             builder.Append('(');
             // First build the columns using the first query (since all fields should be the same).

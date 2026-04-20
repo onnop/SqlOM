@@ -88,7 +88,7 @@ namespace Reeb.SqlOM
         /// <param name="tableName">Name of the table or view</param>
         /// <param name="alias">Alias of the FromTerm</param>
         /// <returns>A FromTerm which represents a database table or view</returns>
-        public static FromTerm Table(string tableName, string alias)
+        public static FromTerm Table(string tableName, string? alias)
         {
             return Table(tableName, alias, null);
         }
@@ -101,7 +101,7 @@ namespace Reeb.SqlOM
         /// <param name="ns">Namespace of the table.</param>
         /// <returns>A FromTerm which represents a database table or view</returns>
         /// <remarks>Use the <paramref name="ns"/> parameter to resolve table ownership</remarks>
-        public static FromTerm Table(string tableName, string alias, string ns)
+        public static FromTerm Table(string tableName, string? alias, string? ns)
         {
             return Table(tableName, alias, ns, null);
         }
@@ -115,7 +115,7 @@ namespace Reeb.SqlOM
         /// <param name="ns2">Second table namespace</param>
         /// <returns>A FromTerm which represents a database table or view</returns>
         /// <remarks>Use the <paramref name="ns1"/> parameter to set table database and <paramref name="ns2"/> to set table owner.</remarks>
-        public static FromTerm Table(string tableName, string alias, string ns1, string ns2)
+        public static FromTerm Table(string tableName, string? alias, string? ns1, string? ns2)
         {
             FromTerm term = new FromTerm();
             term.expr = tableName;
@@ -185,7 +185,7 @@ namespace Reeb.SqlOM
         /// </remarks>
         public static FromTerm TermRef(string name)
         {
-            return Table(null, name);
+            return Table(null!, name);
         }
 
         /// <summary>

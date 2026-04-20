@@ -1,143 +1,161 @@
 using System.Globalization;
 using System.Text;
 
-namespace Reeb.SqlOM.Render
+namespace Reeb.SqlOM.Render;
+
+/// <summary>
+/// Renderer for SQLite
+/// </summary>
+/// <remarks>
+/// Use SQLiteRenderer to render SQL statements for SQLite.
+/// SQLite uses LIMIT for row limiting and does not support WITH CUBE / WITH ROLLUP.
+/// </remarks>
+public class SQLiteRenderer : SqlOmRenderer
 {
     /// <summary>
-    /// Renderer for SqlServer
+    /// Creates a new SQLiteRenderer
     /// </summary>
-    /// <remarks>
-    /// Use SQLiteRenderer to render SQL statements for SQLite database.
-    /// This version of Sql.Net has been tested with SQLite 3.5
-    /// </remarks>
-    public class SQLiteRenderer : SqlOmRenderer
+    public SQLiteRenderer() : base('[', ']')
     {
-        /// <summary>
-        /// Creates a new SQLiteRenderer
-        /// </summary>
-        public SQLiteRenderer() : base('[', ']')
+        DateFormat = "yyyy-MM-dd";
+        DateTimeFormat = "yyyy-MM-dd HH:mm:ss.fff";
+    }
+
+    /// <inheritdoc />
+    protected override void Constant(StringBuilder builder, SqlConstant expr)
+    {
+        SqlDataType type = expr.Type;
+
+        if (type == SqlDataType.Boolean)
+            builder.Append((bool)expr.Value ? "1" : "0");
+        else if (type == SqlDataType.Number)
+            builder.AppendFormat(LiteralCulture, "{0}", expr.Value);
+        else if (type == SqlDataType.Guid)
         {
-            DateFormat = "yyyy-MM-dd";
-            DateTimeFormat = "yyyy-MM-dd HH:mm:ss.fff";
+            builder.Append('\'');
+            builder.Append(SqlEncode(expr.Value.ToString() ?? string.Empty));
+            builder.Append('\'');
         }
-
-        /// <summary>
-        /// Renders a constant
-        /// </summary>
-        /// <param name="builder"></param>
-        /// <param name="expr"></param>
-        protected override void Constant(StringBuilder builder, SqlConstant expr)
+        else if (type == SqlDataType.Binary)
+            builder.Append(ByteArrayToHexString((byte[])expr.Value));
+        else if (type == SqlDataType.String)
         {
-            SqlDataType type = expr.Type;
-
-            if (type == SqlDataType.Boolean)
-                builder.Append(((bool)expr.Value) ? "1" : "0");
-            if (type == SqlDataType.Number)
-                builder.AppendFormat(new CultureInfo("en-US"), "{0}", expr.Value);
-            else if (type == SqlDataType.Guid)
-                builder.AppendFormat("'{0}'", expr.Value.ToString());
-            else if (type == SqlDataType.Binary)
-                builder.Append(ByteArrayToHexString((byte[])expr.Value));
-            else if (type == SqlDataType.String)
+            if (expr.Value is null)
+                builder.Append("null");
+            else
             {
-                if (expr.Value == null)
-                    builder.AppendFormat("{0}", "null");
-                else
-                    builder.AppendFormat("'{0}'", expr.Value.ToString());
-            }
-            else if (type == SqlDataType.Date)
-            {
-                DateTime val = (DateTime)expr.Value;
-                bool dateOnly = (val.Hour == 0 && val.Minute == 0 && val.Second == 0 && val.Millisecond == 0);
-                string format = (dateOnly) ? dateFormat : dateTimeFormat;
-                builder.AppendFormat("'{0}'", val.ToString(format, new CultureInfo("en-us")));
+                builder.Append('\'');
+                builder.Append(SqlEncode(expr.Value.ToString() ?? string.Empty));
+                builder.Append('\'');
             }
         }
-
-        /// <summary>
-        /// Renders IfNull SqlExpression
-        /// </summary>
-        /// <param name="builder"></param>
-        /// <param name="expr"></param>
-        protected override void IfNull(StringBuilder builder, SqlExpression expr)
+        else if (type == SqlDataType.Date)
         {
-            builder.Append("isnull(");
+            DateTime val = (DateTime)expr.Value;
+            bool dateOnly = val.Hour == 0 && val.Minute == 0 && val.Second == 0 && val.Millisecond == 0;
+            string format = dateOnly ? dateFormat : dateTimeFormat;
+            builder.Append('\'');
+            builder.Append(val.ToString(format, LiteralCulture));
+            builder.Append('\'');
+        }
+    }
+
+    /// <inheritdoc />
+    protected override void IfNull(StringBuilder builder, SqlExpression expr)
+    {
+        builder.Append("ifnull(");
+        if (expr.SubExpr1 is not null)
             Expression(builder, expr.SubExpr1);
-            builder.Append(", ");
+        builder.Append(", ");
+        if (expr.SubExpr2 is not null)
             Expression(builder, expr.SubExpr2);
-            builder.Append(")");
-        }
+        builder.Append(')');
+    }
 
-        /// <summary>
-        /// Renders a SELECT statement
-        /// </summary>
-        /// <param name="query">Query definition</param>
-        /// <returns>Generated SQL statement</returns>
-        public override string RenderSelect(SelectQuery query)
+    /// <summary>
+    /// Renders a SELECT statement
+    /// </summary>
+    /// <param name="query">Query definition</param>
+    /// <returns>Generated SQL statement</returns>
+    public override string RenderSelect(SelectQuery query)
+    {
+        return RenderSelect(query, true);
+    }
+
+    string RenderSelect(SelectQuery query, bool renderOrderBy)
+    {
+        query.Validate();
+
+        StringBuilder selectBuilder = new();
+
+        if (query.CommonTableExpressions.Count > 0)
+            RenderCommonTableExpressions(selectBuilder, query.CommonTableExpressions);
+
+        Select(selectBuilder, query.Distinct);
+
+        SelectColumns(selectBuilder, query.Columns);
+
+        FromClause(selectBuilder, query.FromClause, query.TableSpace);
+
+        Where(selectBuilder, query.WherePhrase);
+        WhereClause(selectBuilder, query.WherePhrase);
+
+        GroupBy(selectBuilder, query.GroupByTerms);
+        GroupByTerms(selectBuilder, query.GroupByTerms);
+
+        if (query.GroupByWithCube)
+            throw new InvalidQueryException("SQLite does not support the WITH CUBE modifier.");
+        if (query.GroupByWithRollup)
+            throw new InvalidQueryException("SQLite does not support the WITH ROLLUP modifier.");
+
+        Having(selectBuilder, query.HavingPhrase);
+        WhereClause(selectBuilder, query.HavingPhrase);
+
+        if (renderOrderBy)
         {
-            return RenderSelect(query, true);
+            OrderBy(selectBuilder, query.OrderByTerms);
+            OrderByTerms(selectBuilder, query.OrderByTerms);
         }
 
-        string RenderSelect(SelectQuery query, bool renderOrderBy)
+        bool hasPaging = query.PageIndex >= 0 && query.PageSize > 0;
+        if (hasPaging)
         {
-            query.Validate();
-
-            StringBuilder selectBuilder = new StringBuilder();
-
-            //Start the select statement
-            this.Select(selectBuilder, query.Distinct);
-
-            //Render select columns
-            this.SelectColumns(selectBuilder, query.Columns);
-
-            this.FromClause(selectBuilder, query.FromClause, query.TableSpace);
-
-            this.Where(selectBuilder, query.WherePhrase);
-            this.WhereClause(selectBuilder, query.WherePhrase);
-
-            this.GroupBy(selectBuilder, query.GroupByTerms);
-            this.GroupByTerms(selectBuilder, query.GroupByTerms);
-
-            if (query.GroupByWithCube)
-                selectBuilder.Append(" with cube");
-            else if (query.GroupByWithRollup)
-                selectBuilder.Append(" with rollup");
-
-            this.Having(selectBuilder, query.HavingPhrase);
-            this.WhereClause(selectBuilder, query.HavingPhrase);
-
-            if (renderOrderBy)
-            {
-                this.OrderBy(selectBuilder, query.OrderByTerms);
-                this.OrderByTerms(selectBuilder, query.OrderByTerms);
-            }
-
-            //Render Top clause
-            if (query.Top > -1)
-                selectBuilder.AppendFormat(" limit {0}", query.Top);
-
-            return selectBuilder.ToString();
+            int offset = query.PageIndex * query.PageSize;
+            selectBuilder.Append(" limit ");
+            selectBuilder.Append(query.PageSize.ToString(CultureInfo.InvariantCulture));
+            selectBuilder.Append(" offset ");
+            selectBuilder.Append(offset.ToString(CultureInfo.InvariantCulture));
         }
-
-        /// <summary>
-        /// Renders a row count SELECT statement. 
-        /// </summary>
-        /// <param name="query">Query definition to count rows for</param>
-        /// <returns>Generated SQL statement</returns>
-        /// <remarks>
-        /// Renders a SQL statement which returns a result set with one row and one cell which contains the number of rows <paramref name="query"/> can generate. 
-        /// The generated statement will work nicely with <see cref="System.Data.IDbCommand.ExecuteScalar"/> method.
-        /// </remarks>
-        public override string RenderRowCount(SelectQuery query)
+        else if (query.Top > -1)
         {
-            string baseSql = RenderSelect(query, false);
-
-            SelectQuery countQuery = new SelectQuery();
-            SelectColumn col = new SelectColumn("*", null, "cnt", SqlAggregationFunction.Count);
-            countQuery.Columns.Add(col);
-            countQuery.FromClause.BaseTable = FromTerm.SubQuery(baseSql, "t");
-            return RenderSelect(countQuery);
+            selectBuilder.Append(" limit ");
+            selectBuilder.Append(query.Top.ToString(CultureInfo.InvariantCulture));
         }
 
+        return selectBuilder.ToString();
+    }
+
+    /// <summary>
+    /// Renders a row count SELECT statement.
+    /// </summary>
+    public override string RenderRowCount(SelectQuery query)
+    {
+        string baseSql = RenderSelect(query, false);
+
+        SelectQuery countQuery = new();
+        SelectColumn col = new("*", null!, "cnt", SqlAggregationFunction.Count);
+        countQuery.Columns.Add(col);
+        countQuery.FromClause.BaseTable = FromTerm.SubQuery(baseSql, "t");
+        return RenderSelect(countQuery);
+    }
+
+    /// <summary>
+    /// Renders a paged SELECT statement using SQLite LIMIT/OFFSET.
+    /// </summary>
+    public override string RenderPage(int pageIndex, int pageSize, int totalRowCount, SelectQuery query)
+    {
+        SelectQuery pagedQuery = query.Clone();
+        pagedQuery.SetPaging(pageIndex, pageSize);
+        return RenderSelect(pagedQuery);
     }
 }

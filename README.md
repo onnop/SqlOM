@@ -29,7 +29,7 @@ dotnet add package SqlOM
 
 ### PackageReference
 ```xml
-<PackageReference Include="SqlOM" Version="1.1.0" />
+<PackageReference Include="SqlOM" Version="2.0.0" />
 ```
 
 ## Supported Databases
@@ -53,7 +53,7 @@ Currently the following databases are supported. We continuously add support for
 - ✅ UNION queries
 - ✅ Common Table Expressions (CTEs), including recursive CTEs (`WITH RECURSIVE`)
 - ✅ Paging support (legacy `ROW_NUMBER()` wrapper and modern `OFFSET/FETCH` for SQL Server 2012+, `LIMIT/OFFSET` for PostgreSQL/MySQL/SQLite)
-- ✅ Parameterized queries
+- ✅ Parameterized queries (manual placeholders **and** automatic capture via `RenderSelectCommand` / `RenderInsertCommand` / `RenderUpdateCommand` / `RenderDeleteCommand`)
 - ✅ Cross-Tabs (Pivot Tables)
 - ✅ Attribute-based strongly-typed query building
 - ✅ Fluent API for query building
@@ -735,6 +735,42 @@ command.Parameters.Add("@customerName", SqlDbType.NVarChar).Value = "John";
 command.Parameters.Add("@minAge", SqlDbType.Int).Value = 18;
 ```
 
+#### Automatic parameter capture (`RenderSelectCommand`)
+
+If you don't want to thread `SqlExpression.Parameter(...)` objects through your code, every renderer also exposes `RenderSelectCommand` / `RenderInsertCommand` / `RenderUpdateCommand` / `RenderDeleteCommand` / `RenderBulkInsertCommand`. These render the query, **replace every constant literal with a placeholder** (e.g. `@p0`, `@p1`, ...), and return both the SQL and the captured values:
+
+```csharp
+SelectQuery query = new SelectQuery();
+query.Columns.Add(new SelectColumn("name"));
+query.FromClause.BaseTable = FromTerm.Table("customers");
+query.WherePhrase.Terms.Add(WhereTerm.CreateCompare(
+    SqlExpression.Field("city"), SqlExpression.String("New York"), CompareOperator.Equal));
+query.WherePhrase.Terms.Add(WhereTerm.CreateCompare(
+    SqlExpression.Field("age"), SqlExpression.Number(30), CompareOperator.Greater));
+
+RenderedCommand cmd = new SqlServerRenderer().RenderSelectCommand(query);
+
+// cmd.Sql:        select [name] from [customers] where ([city] = @p0 and [age] > @p1)
+// cmd.Parameters: [ { @p0, "New York", String }, { @p1, 30, Number } ]
+
+using var dbCmd = connection.CreateCommand();
+dbCmd.CommandText = cmd.Sql;
+foreach (var p in cmd.Parameters)
+    dbCmd.Parameters.Add(new SqlParameter(p.Name, p.Value ?? DBNull.Value));
+```
+
+Dialect placeholder prefix:
+
+| Renderer            | Prefix |
+| ------------------- | ------ |
+| `SqlServerRenderer` | `@p0`  |
+| `MySqlRenderer`     | `@p0`  |
+| `SQLiteRenderer`    | `@p0`  |
+| `PostgreSqlRenderer`| `@p0` (works with Npgsql) |
+| `OracleRenderer`    | `:p0`  |
+
+Override `SqlOmRenderer.FormatParameterName(int)` to customise.
+
 ### 18. Paging
 
 Implementing pagination for large result sets:
@@ -899,6 +935,34 @@ See [License.txt](License.txt) for license information.
 Contributions are welcome! If you find a bug or have a feature request, please open an issue on the project repository.
 
 ## Version History
+
+### 2.0.0
+
+**Breaking changes**
+- All built-in collection types (`SelectColumnCollection`, `WhereTermCollection`, `OrderByTermCollection`, `GroupByTermCollection`, `UpdateTermCollection`, `WhereClauseCollection`, `CaseTermCollection`, `CommonTableExpressionCollection`, `SqlConstantCollection`, `InsertQueryCollection`, internal `JoinCollection`) now derive from `System.Collections.ObjectModel.Collection<T>` instead of the legacy non-generic `CollectionBase`.
+  - The familiar surface (`Add`, `Contains`, `IndexOf`, `Insert`, `Remove`, indexer, `foreach`, `Count`, `Clear`) keeps working unchanged.
+  - `Add(T)` now returns `void` instead of `int` (previously the inserted index).
+  - The typed nested `Enumerator` classes (e.g. `WhereTermCollection.WhereClauseEnumerator`) were removed — use `foreach` or `IEnumerator<T>`.
+  - The "copy from same collection type" constructor now accepts `IEnumerable<T>` (which still covers same-type collections, plus arrays and any other enumerable).
+  - `AddRange` now accepts `IEnumerable<T>` (covers arrays and collections of the same element type).
+- Recompilation against the 2.0 assembly is required. Source code that uses the typical patterns compiles unchanged in nearly all cases.
+
+**New features**
+- `RenderedCommand` / `RenderedParameter` plus `RenderSelectCommand` / `RenderInsertCommand` / `RenderUpdateCommand` / `RenderDeleteCommand` / `RenderBulkInsertCommand` on every renderer. These render the SQL with parameter placeholders (`@p0`, `@p1`, ...) and return both the SQL string and the captured constant values, so query output can be safely bound through ADO.NET / Dapper / Npgsql / etc. without the renderer ever inlining a value.
+- Oracle uses `:p0` placeholders; SQL Server / MySQL / SQLite / PostgreSQL use `@p0`. Override `SqlOmRenderer.FormatParameterName(int)` to customise.
+- `SqlOMExtensions.BeginAliasScope()` is now reliable for nested or parallel query construction: sub-query constructors invoked inside a manual scope no longer wipe the parent scope's alias counter.
+- `CommonTableExpressionCollection.Clone()` now preserves `CommonTableExpression.IsRecursive` (previously silently dropped on clone).
+
+### 1.2.0
+
+**New features**
+- Full C# nullable-reference-type (NRT) annotations across the public API. Callers get accurate null-flow analysis for `FromTerm`, `SelectColumn`, `OrderByTerm`, `GroupByTerm`, `UpdateTerm`, `WhereTerm`, `SqlExpression`, and the `InsertQuery` / `UpdateQuery` / `DeleteQuery` / `BulkInsertQuery` families
+- `SqlOMExtensions.BeginAliasScope()` — an `IDisposable` that isolates auto-generated table aliases (`FromTerm.Table<T>()`) to a `using` block; lets you build nested or parallel queries without bleeding alias counters
+- SQLite renderer rewritten with feature parity: Common Table Expressions, `LIMIT`/`OFFSET` paging, `RenderPage`, and SQLite-native `ifnull()`. Unsupported `WITH CUBE` / `WITH ROLLUP` now throw `InvalidQueryException` instead of silently emitting invalid SQL
+
+**Bug fixes**
+- Identifier rendering now escapes the closing-quote character inside identifier bodies (doubles `]`, `"`, or `` ` `` — standard SQL rule). Defense-in-depth against identifier-injection via user-supplied table/column names
+- `SQLiteRenderer.Constant()` inherited the same "missing `else` before Number" bug that the base renderer had in 1.0.x — now fixed, uses `InvariantCulture`, and applies `SqlEncode`
 
 ### 1.1.0
 

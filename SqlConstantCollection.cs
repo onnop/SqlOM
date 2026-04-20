@@ -1,288 +1,99 @@
 using System.Collections;
+using System.Collections.ObjectModel;
 
-namespace Reeb.SqlOM
+namespace Reeb.SqlOM;
+
+/// <summary>
+/// A strongly-typed collection of <see cref="SqlConstant"/> objects.
+/// </summary>
+[Serializable]
+public class SqlConstantCollection : Collection<SqlConstant>
 {
     /// <summary>
-    /// A collection of elements of type SqlConstant
+    /// Creates a new, empty <see cref="SqlConstantCollection"/>.
     /// </summary>
-    public class SqlConstantCollection : System.Collections.CollectionBase
+    public SqlConstantCollection()
     {
-        /// <summary>
-        /// Initializes a new empty instance of the SqlConstantCollection class.
-        /// </summary>
-        public SqlConstantCollection()
-        {
-            // empty
-        }
-
-        /// <summary>
-        /// Creates a SqlConstantCollection from a list of Guids.
-        /// </summary>
-        public static SqlConstantCollection FromGuids(IEnumerable<Guid> values)
-        {
-            var collection = new SqlConstantCollection();
-            foreach (var value in values)
-            {
-                collection.Add(SqlConstant.Guid(value));
-            }
-            return collection;
-        }
-
-        /// <summary>
-        /// Initializes a new empty instance of the SqlConstantCollection class with the specified initial capacity
-        /// </summary>
-        public SqlConstantCollection(int capacity)
-        {
-            this.InnerList.Capacity = capacity;
-        }
-
-        /// <summary>
-        /// Initializes a new instance of the SqlConstantCollection class, containing elements
-        /// copied from an array.
-        /// </summary>
-        /// <param name="items">
-        /// The array whose elements are to be added to the new SqlConstantCollection.
-        /// </param>
-        public SqlConstantCollection(SqlConstant[] items)
-        {
-            this.AddRange(items);
-        }
-
-        /// <summary>
-        /// Initializes a new instance of the SqlConstantCollection class, containing elements
-        /// copied from another instance of SqlConstantCollection
-        /// </summary>
-        /// <param name="items">
-        /// The SqlConstantCollection whose elements are to be added to the new SqlConstantCollection.
-        /// </param>
-        public SqlConstantCollection(SqlConstantCollection items)
-        {
-            this.AddRange(items);
-        }
-
-        /// <summary>
-        /// Creates a SqlConstantCollection from a list of values.
-        /// </summary>
-        /// <remarks>
-        /// The type of SqlConstant items in the collection is determined automatically.
-        /// See <see cref="Add"/> method for more info.
-        /// </remarks>
-        /// <param name="values"></param>
-        /// <returns></returns>
-        public static SqlConstantCollection FromList(IList values)
-        {
-            SqlConstantCollection collection = new SqlConstantCollection(values.Count);
-            foreach (object val in values)
-                collection.Add(val);
-            return collection;
-        }
-
-        /// <summary>
-        /// Adds a value
-        /// </summary>
-        /// <param name="val">The value which is to be added</param>
-        /// <remarks>
-        /// This method automatically determins the type of the value and creates the appropriate SqlConstant object.
-        /// </remarks>
-        public void Add(object val)
-        {
-            if (val == null)
-                return;
-
-            SqlConstant constant;
-            if (val is string)
-                constant = SqlConstant.String((string)val);
-            else if (val is int)
-                constant = SqlConstant.Number((int)val);
-            else if (val is DateTime)
-                constant = SqlConstant.Date((DateTime)val);
-            else if (val is double)
-                constant = SqlConstant.Number((double)val);
-            else if (val is float)
-                constant = SqlConstant.Number((double)val);
-            else if (val is decimal)
-                constant = SqlConstant.Number((decimal)val);
-            else if (val is long)
-                constant = SqlConstant.Number((long)val);
-            else
-                constant = SqlConstant.String(val.ToString());
-
-            Add(constant);
-        }
-
-        /// <summary>
-        /// Adds the elements of an array to the end of this SqlConstantCollection.
-        /// </summary>
-        /// <param name="items">
-        /// The array whose elements are to be added to the end of this SqlConstantCollection.
-        /// </param>
-        public virtual void AddRange(SqlConstant[] items)
-        {
-            foreach (SqlConstant item in items)
-            {
-                this.List.Add(item);
-            }
-        }
-
-        /// <summary>
-        /// Adds the elements of another SqlConstantCollection to the end of this SqlConstantCollection.
-        /// </summary>
-        /// <param name="items">
-        /// The SqlConstantCollection whose elements are to be added to the end of this SqlConstantCollection.
-        /// </param>
-        public virtual void AddRange(SqlConstantCollection items)
-        {
-            foreach (SqlConstant item in items)
-            {
-                this.List.Add(item);
-            }
-        }
-
-        /// <summary>
-        /// Adds an instance of type SqlConstant to the end of this SqlConstantCollection.
-        /// </summary>
-        /// <param name="value">
-        /// The SqlConstant to be added to the end of this SqlConstantCollection.
-        /// </param>
-        public virtual void Add(SqlConstant value)
-        {
-            this.List.Add(value);
-        }
-
-        /// <summary>
-        /// Determines whether a specfic SqlConstant value is in this SqlConstantCollection.
-        /// </summary>
-        /// <param name="value">
-        /// The SqlConstant value to locate in this SqlConstantCollection.
-        /// </param>
-        /// <returns>
-        /// true if value is found in this SqlConstantCollection;
-        /// false otherwise.
-        /// </returns>
-        public virtual bool Contains(SqlConstant value)
-        {
-            return this.List.Contains(value);
-        }
-
-        /// <summary>
-        /// Return the zero-based index of the first occurrence of a specific value
-        /// in this SqlConstantCollection
-        /// </summary>
-        /// <param name="value">
-        /// The SqlConstant value to locate in the SqlConstantCollection.
-        /// </param>
-        /// <returns>
-        /// The zero-based index of the first occurrence of the _ELEMENT value if found;
-        /// -1 otherwise.
-        /// </returns>
-        public virtual int IndexOf(SqlConstant value)
-        {
-            return this.List.IndexOf(value);
-        }
-
-        /// <summary>
-        /// Inserts an element into the SqlConstantCollection at the specified index
-        /// </summary>
-        /// <param name="index">
-        /// The index at which the SqlConstant is to be inserted.
-        /// </param>
-        /// <param name="value">
-        /// The SqlConstant to insert.
-        /// </param>
-        public virtual void Insert(int index, SqlConstant value)
-        {
-            this.List.Insert(index, value);
-        }
-
-        /// <summary>
-        /// Gets or sets the SqlConstant at the given index in this SqlConstantCollection.
-        /// </summary>
-        public virtual SqlConstant this[int index]
-        {
-            get
-            {
-                return (SqlConstant)this.List[index];
-            }
-            set
-            {
-                this.List[index] = value;
-            }
-        }
-
-        /// <summary>
-        /// Removes the first occurrence of a specific SqlConstant from this SqlConstantCollection.
-        /// </summary>
-        /// <param name="value">
-        /// The SqlConstant value to remove from this SqlConstantCollection.
-        /// </param>
-        public virtual void Remove(SqlConstant value)
-        {
-            this.List.Remove(value);
-        }
-
-        /// <summary>
-        /// Type-specific enumeration class, used by SqlConstantCollection.GetEnumerator.
-        /// </summary>
-        public class Enumerator : System.Collections.IEnumerator
-        {
-            private System.Collections.IEnumerator wrapped;
-
-            /// <summary>
-            /// 
-            /// </summary>
-            /// <param name="collection"></param>
-            public Enumerator(SqlConstantCollection collection)
-            {
-                this.wrapped = ((System.Collections.CollectionBase)collection).GetEnumerator();
-            }
-
-            /// <summary>
-            /// 
-            /// </summary>
-            public SqlConstant Current
-            {
-                get
-                {
-                    return (SqlConstant)(this.wrapped.Current);
-                }
-            }
-
-            object System.Collections.IEnumerator.Current
-            {
-                get
-                {
-                    return (SqlConstant)(this.wrapped.Current);
-                }
-            }
-
-            /// <summary>
-            /// 
-            /// </summary>
-            /// <returns></returns>
-            public bool MoveNext()
-            {
-                return this.wrapped.MoveNext();
-            }
-
-            /// <summary>
-            /// 
-            /// </summary>
-            public void Reset()
-            {
-                this.wrapped.Reset();
-            }
-        }
-
-        /// <summary>
-        /// Returns an enumerator that can iterate through the elements of this SqlConstantCollection.
-        /// </summary>
-        /// <returns>
-        /// An object that implements System.Collections.IEnumerator.
-        /// </returns>        
-        public new virtual SqlConstantCollection.Enumerator GetEnumerator()
-        {
-            return new SqlConstantCollection.Enumerator(this);
-        }
     }
 
+    /// <summary>
+    /// Creates a new <see cref="SqlConstantCollection"/> with the specified initial capacity.
+    /// </summary>
+    public SqlConstantCollection(int capacity) : base(new List<SqlConstant>(capacity))
+    {
+    }
+
+    /// <summary>
+    /// Creates a new <see cref="SqlConstantCollection"/> populated from <paramref name="items"/>.
+    /// </summary>
+    public SqlConstantCollection(IEnumerable<SqlConstant> items)
+    {
+        if (items is null) throw new ArgumentNullException(nameof(items));
+        foreach (var item in items) Add(item);
+    }
+
+    /// <summary>
+    /// Creates a new <see cref="SqlConstantCollection"/> populated from <paramref name="items"/>.
+    /// </summary>
+    public SqlConstantCollection(SqlConstant[] items) : this((IEnumerable<SqlConstant>)items) { }
+
+    /// <summary>
+    /// Adds the elements of <paramref name="items"/> to the end of this collection.
+    /// </summary>
+    public void AddRange(IEnumerable<SqlConstant> items)
+    {
+        if (items is null) throw new ArgumentNullException(nameof(items));
+        foreach (var item in items) Add(item);
+    }
+
+    /// <summary>
+    /// Adds a CLR value, automatically wrapping it in the appropriate <see cref="SqlConstant"/>
+    /// based on its runtime type. Null values are ignored.
+    /// </summary>
+    public void Add(object? val)
+    {
+        if (val is null)
+            return;
+
+        SqlConstant constant = val switch
+        {
+            string s => SqlConstant.String(s),
+            int i => SqlConstant.Number(i),
+            long l => SqlConstant.Number(l),
+            double d => SqlConstant.Number(d),
+            float f => SqlConstant.Number(f),
+            decimal m => SqlConstant.Number(m),
+            DateTime dt => SqlConstant.Date(dt),
+            Guid g => SqlConstant.Guid(g),
+            SqlConstant sc => sc,
+            _ => SqlConstant.String(val.ToString() ?? string.Empty)
+        };
+
+        Add(constant);
+    }
+
+    /// <summary>
+    /// Builds a <see cref="SqlConstantCollection"/> from a sequence of GUIDs.
+    /// </summary>
+    public static SqlConstantCollection FromGuids(IEnumerable<Guid> values)
+    {
+        if (values is null) throw new ArgumentNullException(nameof(values));
+        var collection = new SqlConstantCollection();
+        foreach (var value in values)
+            collection.Add(SqlConstant.Guid(value));
+        return collection;
+    }
+
+    /// <summary>
+    /// Builds a <see cref="SqlConstantCollection"/> from a list of arbitrary CLR values.
+    /// Element types are inferred via <see cref="Add(object)"/>.
+    /// </summary>
+    public static SqlConstantCollection FromList(IList values)
+    {
+        if (values is null) throw new ArgumentNullException(nameof(values));
+        var collection = new SqlConstantCollection(values.Count);
+        foreach (object val in values)
+            collection.Add(val);
+        return collection;
+    }
 }

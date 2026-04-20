@@ -22,9 +22,9 @@ namespace Reeb.SqlOM
     [DebuggerDisplay("SQL = {SQL}")]
     public class UpdateQuery
     {
-        UpdateTermCollection terms = new UpdateTermCollection();
-        WhereClause whereClause = new WhereClause(WhereClauseRelationship.And);
-        string tableName;
+        readonly UpdateTermCollection terms = new UpdateTermCollection();
+        readonly WhereClause whereClause = new WhereClause(WhereClauseRelationship.And);
+        string? tableName;
 
         /// <summary>
         /// Used for debugger purposes only
@@ -44,7 +44,7 @@ namespace Reeb.SqlOM
         /// Creates a new UpdateQuery and resets alias tracking for Table&lt;T&gt;().
         /// </summary>
         /// <param name="tableName"></param>
-        public UpdateQuery(string tableName)
+        public UpdateQuery(string? tableName)
         {
             SqlOMExtensions.ResetAliases();
             this.tableName = tableName;
@@ -72,7 +72,7 @@ namespace Reeb.SqlOM
         /// <summary>
         /// Gets or set the name of a table to be updated
         /// </summary>
-        public string TableName
+        public string? TableName
         {
             get { return this.tableName; }
             set { this.tableName = value; }

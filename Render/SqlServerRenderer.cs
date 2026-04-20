@@ -229,7 +229,7 @@ public class SqlServerRenderer : SqlOmRenderer
             OrderByTerm(columns, new OrderByTerm(orderByTerm.Field, wrapper.FromClause.BaseTable!, orderByTerm.Direction));
         }
 
-        wrapper.Columns.Add(new SelectColumn("*", null!));
+        wrapper.Columns.Add(new SelectColumn("*", (FromTerm?)null));
         wrapper.Columns.Add(new SelectColumn(SqlExpression.Raw($"ROW_NUMBER() OVER (ORDER BY {columns})"), "ROW_NUMBER"));
         SelectQuery wrapperRowFilter = new(FromTerm.SubQuery(wrapper, "wrapperRowFilter"));
 
@@ -267,7 +267,7 @@ public class SqlServerRenderer : SqlOmRenderer
         string baseSql = RenderSelect(query, false);
 
         SelectQuery countQuery = new SelectQuery();
-        SelectColumn col = new SelectColumn("*", null!, "cnt", SqlAggregationFunction.Count);
+        SelectColumn col = new SelectColumn("*", (FromTerm?)null, "cnt", SqlAggregationFunction.Count);
         countQuery.Columns.Add(col);
         countQuery.FromClause.BaseTable = FromTerm.SubQuery(baseSql, "t");
         return RenderSelect(countQuery);

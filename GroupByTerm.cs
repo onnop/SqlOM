@@ -9,15 +9,15 @@ namespace Reeb.SqlOM
     /// </remarks>
     public class GroupByTerm
     {
-        string field;
-        FromTerm table;
+        readonly string field;
+        readonly FromTerm? table;
 
         /// <summary>
         /// Creates a GROUP BY term with field name and table alias
         /// </summary>
         /// <param name="field">Name of a field to group by</param>
         /// <param name="table">The table this field belongs to</param>
-        public GroupByTerm(string field, FromTerm table)
+        public GroupByTerm(string field, FromTerm? table)
         {
             this.field = field;
             this.table = table;
@@ -42,7 +42,7 @@ namespace Reeb.SqlOM
         /// <summary>
         /// Gets the table the field belongs to
         /// </summary>
-        public FromTerm Table
+        public FromTerm? Table
         {
             get { return this.table; }
         }
@@ -53,9 +53,9 @@ namespace Reeb.SqlOM
         /// <remarks>
         /// Gets the name of a FromTerm the field specified by <see cref="GroupByTerm.Field">Field</see> property.
         /// </remarks>
-        internal string TableAlias
+        internal string? TableAlias
         {
-            get { return (table == null) ? null : table.RefName; }
+            get { return table?.RefName; }
         }
     }
 }

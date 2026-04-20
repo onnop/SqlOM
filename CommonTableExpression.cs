@@ -26,7 +26,7 @@ public class CommonTableExpression
     /// <param name="name">The name of the CTE</param>
     /// <param name="query">The query that defines the CTE</param>
     /// <param name="columnNames">The column names for the CTE</param>
-    public CommonTableExpression(string name, SelectQuery query, string[] columnNames)
+    public CommonTableExpression(string name, SelectQuery query, string[]? columnNames)
     {
         this.name = name;
         this.query = query;

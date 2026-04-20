@@ -5,8 +5,8 @@ namespace Reeb.SqlOM
     /// </summary>
     public class UpdateTerm
     {
-        string fieldName;
-        SqlExpression val;
+        readonly string fieldName;
+        readonly SqlExpression val;
 
         /// <summary>
         /// Creates an UpdateTerm
@@ -35,7 +35,7 @@ namespace Reeb.SqlOM
             get { return this.val; }
         }
 
-        public object InternalValue
+        public object? InternalValue
         {
             get { return this.val.Value == null ? null : ((SqlConstant)this.val.Value).Value; }
         }

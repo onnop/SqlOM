@@ -5,8 +5,8 @@ namespace Reeb.SqlOM
     /// </summary>
     public class CaseClause
     {
-        CaseTermCollection terms = new CaseTermCollection();
-        SqlExpression elseVal = null;
+        readonly CaseTermCollection terms = new CaseTermCollection();
+        SqlExpression? elseVal = null;
 
         /// <summary>
         /// Creates a new CaseClause
@@ -26,7 +26,7 @@ namespace Reeb.SqlOM
         /// <summary>
         /// Gets or sets the value CASE default value
         /// </summary>
-        public SqlExpression ElseValue
+        public SqlExpression? ElseValue
         {
             get { return this.elseVal; }
             set { this.elseVal = value; }

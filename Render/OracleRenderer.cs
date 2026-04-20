@@ -28,10 +28,12 @@ namespace Reeb.SqlOM.Render
         protected override void IfNull(StringBuilder builder, SqlExpression expr)
         {
             builder.Append("nvl(");
-            Expression(builder, expr.SubExpr1);
+            if (expr.SubExpr1 is not null)
+                Expression(builder, expr.SubExpr1);
             builder.Append(", ");
-            Expression(builder, expr.SubExpr2);
-            builder.Append(")");
+            if (expr.SubExpr2 is not null)
+                Expression(builder, expr.SubExpr2);
+            builder.Append(')');
         }
 
         /// <summary>
@@ -43,6 +45,12 @@ namespace Reeb.SqlOM.Render
         }
 
         /// <summary>
+        /// Oracle uses <c>:name</c> for bind parameters.
+        /// </summary>
+        protected override string FormatParameterName(int index)
+            => ":p" + index.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+        /// <summary>
         /// Renders bitwise and
         /// </summary>
         /// <param name="builder"></param>
@@ -50,9 +58,9 @@ namespace Reeb.SqlOM.Render
         protected override void BitwiseAnd(StringBuilder builder, WhereTerm term)
         {
             builder.Append("BITAND(");
-            Expression(builder, term.Expr1);
+            Expression(builder, term.Expr1!);
             builder.Append(", ");
-            Expression(builder, term.Expr2);
+            Expression(builder, term.Expr2!);
             builder.Append(") > 0");
         }
 
@@ -132,7 +140,7 @@ namespace Reeb.SqlOM.Render
             string baseSql = RenderSelect(query, -1);
 
             SelectQuery countQuery = new SelectQuery();
-            SelectColumn col = new SelectColumn("*", null, "cnt", SqlAggregationFunction.Count);
+            SelectColumn col = new SelectColumn("*", (FromTerm?)null, "cnt", SqlAggregationFunction.Count);
             countQuery.Columns.Add(col);
             countQuery.FromClause.BaseTable = FromTerm.SubQuery(baseSql, "t");
             return RenderSelect(countQuery);

@@ -6,16 +6,60 @@ namespace Reeb.SqlOM;
 /// <summary>
 /// Helper methods for SqlOM strongly-typed query building.
 /// </summary>
+/// <remarks>
+/// <para>
+/// Alias tracking for <see cref="FromTerm.Table{T}()"/> is stored in an
+/// <see cref="AsyncLocal{T}"/> slot so that auto-generated aliases (e.g. <c>c</c>, <c>c2</c>, <c>c3</c>)
+/// remain unique within the async execution context that builds the query. The counter is reset
+/// automatically at the top of every <see cref="SelectQuery"/>, <see cref="InsertQuery"/>,
+/// <see cref="UpdateQuery"/>, <see cref="DeleteQuery"/>, and <see cref="BulkInsertQuery"/> constructor.
+/// </para>
+/// <para>
+/// For nested or parallel query construction, call <see cref="BeginAliasScope"/> to get an
+/// <see cref="IDisposable"/> that isolates the alias counters for the lifetime of the <c>using</c> block
+/// and restores the prior counters on dispose.
+/// </para>
+/// </remarks>
 public static class SqlOMExtensions
 {
     private static readonly AsyncLocal<Dictionary<string, int>?> _aliasContext = new();
+    private static readonly AsyncLocal<int> _aliasScopeDepth = new();
 
     /// <summary>
     /// Resets alias tracking. Called automatically by query constructors.
+    /// No-op when a manual <see cref="BeginAliasScope"/> block is active, so sub-query
+    /// construction inside an explicit scope cannot wipe the caller's alias counter.
     /// </summary>
     internal static void ResetAliases()
     {
+        if (_aliasScopeDepth.Value > 0)
+            return;
+
         _aliasContext.Value = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// Begins a nested alias-tracking scope. While the returned <see cref="IDisposable"/> is alive,
+    /// calls to <see cref="FromTerm.Table{T}()"/> issue unique aliases within an isolated counter;
+    /// the prior alias context is restored on disposal.
+    /// </summary>
+    /// <returns>An <see cref="IDisposable"/> that restores the prior alias context when disposed.</returns>
+    /// <example>
+    /// <code>
+    /// using (SqlOMExtensions.BeginAliasScope())
+    /// {
+    ///     var sub = new SelectQuery();
+    ///     sub.FromClause.BaseTable = FromTerm.Table&lt;Product&gt;();
+    ///     // 'p' is chosen inside this scope without affecting the outer counter
+    /// }
+    /// </code>
+    /// </example>
+    public static IDisposable BeginAliasScope()
+    {
+        var previous = _aliasContext.Value;
+        _aliasContext.Value = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        _aliasScopeDepth.Value++;
+        return new AliasScope(previous);
     }
 
     /// <summary>
@@ -37,6 +81,25 @@ public static class SqlOMExtensions
 
         context[baseAlias] = count + 1;
         return $"{baseAlias}{count + 1}";
+    }
+
+    private sealed class AliasScope : IDisposable
+    {
+        private readonly Dictionary<string, int>? _previous;
+        private bool _disposed;
+
+        internal AliasScope(Dictionary<string, int>? previous)
+        {
+            _previous = previous;
+        }
+
+        public void Dispose()
+        {
+            if (_disposed) return;
+            _disposed = true;
+            _aliasContext.Value = _previous;
+            _aliasScopeDepth.Value = Math.Max(0, _aliasScopeDepth.Value - 1);
+        }
     }
 
     /// <summary>

@@ -16,11 +16,11 @@ namespace Reeb.SqlOM
     /// </remarks>
     public class WhereTerm : ICloneable
     {
-        SqlExpression expr1, expr2, expr3;
+        SqlExpression? expr1, expr2, expr3;
         CompareOperator op;
         WhereTermType type;
-        SqlConstantCollection values;
-        object subQuery;
+        SqlConstantCollection? values;
+        object? subQuery;
 
         private WhereTerm()
         {
@@ -270,17 +270,17 @@ namespace Reeb.SqlOM
             return term;
         }
 
-        internal SqlExpression Expr1
+        internal SqlExpression? Expr1
         {
             get { return expr1; }
         }
 
-        internal SqlExpression Expr2
+        internal SqlExpression? Expr2
         {
             get { return expr2; }
         }
 
-        internal SqlExpression Expr3
+        internal SqlExpression? Expr3
         {
             get { return expr3; }
         }
@@ -295,12 +295,12 @@ namespace Reeb.SqlOM
             get { return type; }
         }
 
-        internal SqlConstantCollection Values
+        internal SqlConstantCollection? Values
         {
             get { return values; }
         }
 
-        internal object SubQuery
+        internal object? SubQuery
         {
             get { return subQuery; }
         }
@@ -324,7 +324,7 @@ namespace Reeb.SqlOM
             a.op = op;
             a.type = type;
             a.subQuery = subQuery;
-            a.values = new SqlConstantCollection(values);
+            a.values = values is null ? null : new SqlConstantCollection(values);
 
             return a;
         }

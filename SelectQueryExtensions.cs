@@ -41,7 +41,7 @@ namespace Reeb.SqlOM
         public static SelectQuery OrderBy<T>(this SelectQuery query, Expression<Func<T, object?>> fieldExpr, FromTerm table, OrderByDirection direction = OrderByDirection.Ascending)
         {
             var field = SqlExpression.Field(fieldExpr, table);
-            query.OrderByTerms.Add(new OrderByTerm(field.ToString(), table, direction));
+            query.OrderByTerms.Add(new OrderByTerm(field.ToString() ?? string.Empty, table, direction));
             return query;
         }
 
@@ -60,7 +60,7 @@ namespace Reeb.SqlOM
         public static SelectQuery GroupBy<T>(this SelectQuery query, Expression<Func<T, object?>> fieldExpr, FromTerm table)
         {
             var field = SqlExpression.Field(fieldExpr, table);
-            query.GroupByTerms.Add(new GroupByTerm(field.ToString(), table));
+            query.GroupByTerms.Add(new GroupByTerm(field.ToString() ?? string.Empty, table));
             return query;
         }
 

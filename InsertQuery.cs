@@ -23,8 +23,8 @@ namespace Reeb.SqlOM
     [DebuggerDisplay("SQL = {SQL}")]
     public class InsertQuery
     {
-        UpdateTermCollection terms = new UpdateTermCollection();
-        string tableName;
+        readonly UpdateTermCollection terms = new UpdateTermCollection();
+        string? tableName;
 
         /// <summary>
         /// Used for debugger purposes only
@@ -44,7 +44,7 @@ namespace Reeb.SqlOM
         /// Create an InsertQuery and resets alias tracking for Table&lt;T&gt;().
         /// </summary>
         /// <param name="tableName">The name of the table to be inseserted into</param>
-        public InsertQuery(string tableName)
+        public InsertQuery(string? tableName)
         {
             SqlOMExtensions.ResetAliases();
             this.tableName = tableName;
@@ -64,7 +64,7 @@ namespace Reeb.SqlOM
         /// <summary>
         /// Gets or set the name of a table to be inserted into
         /// </summary>
-        public string TableName
+        public string? TableName
         {
             get { return this.tableName; }
             set { this.tableName = value; }

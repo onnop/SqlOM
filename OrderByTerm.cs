@@ -19,9 +19,9 @@ namespace Reeb.SqlOM
     /// </remarks>
     public class OrderByTerm
     {
-        string field;
-        FromTerm table;
-        OrderByDirection direction;
+        readonly string field;
+        readonly FromTerm? table;
+        readonly OrderByDirection direction;
 
         /// <summary>
         /// Creates an ORDER BY term with field name and table alias
@@ -29,7 +29,7 @@ namespace Reeb.SqlOM
         /// <param name="field">Name of a field to order by</param>
         /// <param name="table">The table this field belongs to</param>
         /// <param name="dir">Order by direction</param>
-        public OrderByTerm(string field, FromTerm table, OrderByDirection dir)
+        public OrderByTerm(string field, FromTerm? table, OrderByDirection dir)
         {
             this.field = field;
             this.table = table;
@@ -67,15 +67,15 @@ namespace Reeb.SqlOM
         /// <remarks>
         /// Gets the name of a FromTerm the field specified by <see cref="OrderByTerm.Field">Field</see> property.
         /// </remarks>
-        public string TableAlias
+        public string? TableAlias
         {
-            get { return (table == null) ? null : table.RefName; }
+            get { return table?.RefName; }
         }
 
         /// <summary>
         /// Returns the FromTerm associated with this OrderByTerm
         /// </summary>
-        public FromTerm Table
+        public FromTerm? Table
         {
             get { return table; }
         }
